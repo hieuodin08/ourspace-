@@ -157,7 +157,7 @@ var CallRoom = ({ user, onLeave }) => {
           </div>
 
           <div className="ml-auto flex items-center gap-2 text-sm flex-wrap">
-            <button onClick={() => setShowJoinDialog(true)} disabled={peerConn.status !== 'connected' || !media.stream}
+            <button onClick={() => setShowJoinDialog(true)} disabled={peerConn.status !== 'connected'}
               className="os-call-btn relative text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold disabled:opacity-50">
               <span className="os-call-ring relative z-10"><Phone className="w-4 h-4" /></span>
               <span className="relative z-10">Gọi người khác</span>
@@ -214,25 +214,23 @@ var CallRoom = ({ user, onLeave }) => {
                 </div>
               )}
 
-              {/* Remote video full-bleed (khi đã có stream) */}
-              {media.stream && (
-                firstPeer ? (
-                  <RemoteVideo peerId={firstPeer[0]} peerData={firstPeer[1]} showLandmarks={showLandmarks} />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-                    <Users className="w-16 h-16 text-slate-600 mb-3" />
-                    <p className="text-slate-300 text-center font-semibold mb-2">Chưa có ai khác</p>
-                    <p className="text-xs text-slate-500 text-center mb-4 max-w-xs">
-                      <b>Cách 1:</b> Share ID của bạn → người khác gọi bạn<br/>
-                      <b>Cách 2:</b> Bấm "Gọi người khác" → nhập ID của họ
-                    </p>
-                    <button onClick={copyMyId} disabled={!peerConn.myPeerId}
-                      className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/40 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50">
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      {copied ? 'Đã sao chép!' : 'Sao chép ID'}
-                    </button>
-                  </div>
-                )
+              {/* Remote video full-bleed — luôn hiển thị, không phụ thuộc local stream */}
+              {firstPeer ? (
+                <RemoteVideo peerId={firstPeer[0]} peerData={firstPeer[1]} showLandmarks={showLandmarks} />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+                  <Users className="w-16 h-16 text-slate-600 mb-3" />
+                  <p className="text-slate-300 text-center font-semibold mb-2">Chưa có ai khác</p>
+                  <p className="text-xs text-slate-500 text-center mb-4 max-w-xs">
+                    <b>Cách 1:</b> Share ID của bạn → người khác gọi bạn<br/>
+                    <b>Cách 2:</b> Bấm "Gọi người khác" → nhập ID của họ
+                  </p>
+                  <button onClick={copyMyId} disabled={!peerConn.myPeerId}
+                    className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/40 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50">
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Đã sao chép!' : 'Sao chép ID'}
+                  </button>
+                </div>
               )}
 
               {/* Local PIP — góc trên-phải, HandSkeleton vẽ bên trong PIP */}

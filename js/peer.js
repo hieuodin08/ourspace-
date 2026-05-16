@@ -69,7 +69,7 @@ var usePeerConnection = (userName, localStream) => {
     });
     peer.on('call', (call) => {
       console.log('📞 Incoming call:', call.peer);
-      call.answer(streamRef.current);
+      call.answer(streamRef.current || new MediaStream());
       call.on('stream', (rs) => {
         console.log('🎥 Got remote stream:', call.peer);
         updatePeer(call.peer, { stream: rs, call });
@@ -94,15 +94,13 @@ var usePeerConnection = (userName, localStream) => {
   }, []);
 
   const connectTo = useCallback((targetId) => {
-    if (!peerRef.current || !streamRef.current) {
-      console.error('Chưa sẵn sàng (cần camera trước)'); return false;
-    }
+    if (!peerRef.current) { console.error('PeerJS chưa sẵn sàng'); return false; }
     if (targetId === myPeerId) return false;
     if (peersRef.current[targetId]) return true;
     console.log('📞 Calling:', targetId);
     const conn = peerRef.current.connect(targetId, { reliable: true });
     setupDataConn(conn);
-    const call = peerRef.current.call(targetId, streamRef.current);
+    const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
     call.on('stream', (rs) => updatePeer(targetId, { stream: rs, call }));
     call.on('close', () => removePeer(targetId));
     return true;

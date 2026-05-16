@@ -17,6 +17,7 @@ var useMedia = () => {
       { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: true },
       { video: { facingMode: 'user' }, audio: true },
       { video: true, audio: true },
+      { video: false, audio: true },
       { video: true, audio: false },
     ];
     let lastErr = null;
