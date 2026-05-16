@@ -32,10 +32,19 @@ var CallRoom = ({ user, onLeave }) => {
   const asl = useASLLetterRecognition(aslEnabled ? handTracking.allLandmarks : [], aslEnabled);
   const peerConn = usePeerConnection(user.name, media.stream);
 
-  useEffect(() => () => media.stopMedia(), []);
+  // Giữ ref tới stream hiện tại để cleanup dùng được giá trị mới nhất
+  // (tránh stale closure khi useEffect cleanup chạy lúc unmount).
+  const streamForCleanupRef = useRef(null);
+  useEffect(() => { streamForCleanupRef.current = media.stream; }, [media.stream]);
+  useEffect(() => () => {
+    const s = streamForCleanupRef.current;
+    if (s) s.getTracks().forEach(t => t.stop());
+  }, []);
 
   useEffect(() => {
-    if (localVideoRef.current && media.stream) localVideoRef.current.srcObject = media.stream;
+    if (!localVideoRef.current) return;
+    // Khi stream = null (user tắt cam), gán null để video không freeze ở frame cuối.
+    localVideoRef.current.srcObject = media.stream || null;
   }, [media.stream]);
 
   useEffect(() => {
@@ -46,8 +55,13 @@ var CallRoom = ({ user, onLeave }) => {
   }, [media.stream, stt.supported]);
 
   const broadcastASLThrottled = useThrottledCallback(peerConn.broadcast, 100);
+  // Theo dõi xem lần broadcast cuối có gửi "có tay" không, để khi peer hạ tay
+  // ta gửi đúng 1 payload null thay vì spam mỗi frame, và remote video xoá chữ cũ.
+  const lastBroadcastHadHandRef = useRef(false);
   useEffect(() => {
-    if (asl.letter && asl.confidence > 0.7 && handTracking.allLandmarks?.length > 0) {
+    const hasValid = asl.letter && asl.confidence > 0.7 && handTracking.allLandmarks?.length > 0;
+    if (hasValid) {
+      lastBroadcastHadHandRef.current = true;
       broadcastASLThrottled({
         type: 'asl',
         payload: {
@@ -56,6 +70,13 @@ var CallRoom = ({ user, onLeave }) => {
           word: asl.word,
           landmarks: compressLandmarks(handTracking.allLandmarks),
         }
+      });
+    } else if (lastBroadcastHadHandRef.current) {
+      // Vừa chuyển từ "có tay" sang "không có tay" → gửi 1 lần để xoá chữ trên remote.
+      lastBroadcastHadHandRef.current = false;
+      broadcastASLThrottled({
+        type: 'asl',
+        payload: { letter: null, confidence: 0, word: '', landmarks: [] },
       });
     }
   }, [asl.letter, asl.confidence, asl.word, handTracking.allLandmarks, broadcastASLThrottled]);
@@ -69,11 +90,14 @@ var CallRoom = ({ user, onLeave }) => {
     });
   }, [peerConn.onData, visualAlert]);
 
+  const copiedTimerRef = useRef(null);
+  useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
   const copyMyId = () => {
     if (peerConn.myPeerId) {
       navigator.clipboard?.writeText(peerConn.myPeerId);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     }
   };
 

@@ -244,10 +244,18 @@ var ChatPanel = ({ userId, userName, onSpeak, onBroadcast, remoteMessages }) => 
   const [justSentId, setJustSentId] = useState(null);
   const [kick, setKick] = useState(false);
   const endRef = useRef(null);
+  const sentTimerRef = useRef(null);
+  const kickTimerRef = useRef(null);
 
   const allMessages = [...localMessages, ...remoteMessages].sort((a, b) => a.timestamp - b.timestamp);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [allMessages.length]);
+
+  // Clear pending timers khi unmount để tránh setState on unmounted component.
+  useEffect(() => () => {
+    if (sentTimerRef.current) clearTimeout(sentTimerRef.current);
+    if (kickTimerRef.current) clearTimeout(kickTimerRef.current);
+  }, []);
 
   const send = () => {
     if (!input.trim()) return;
@@ -258,8 +266,10 @@ var ChatPanel = ({ userId, userName, onSpeak, onBroadcast, remoteMessages }) => 
     setJustSentId(id);
     setKick(true);
     setInput('');
-    setTimeout(() => setJustSentId(null), 900);
-    setTimeout(() => setKick(false), 500);
+    if (sentTimerRef.current) clearTimeout(sentTimerRef.current);
+    if (kickTimerRef.current) clearTimeout(kickTimerRef.current);
+    sentTimerRef.current = setTimeout(() => setJustSentId(null), 900);
+    kickTimerRef.current = setTimeout(() => setKick(false), 500);
   };
 
   const recall = (id) => {
