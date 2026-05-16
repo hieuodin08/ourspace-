@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ourspace - Video Call cho người khiếm thính</title>
+
+  <!-- Thư viện CDN -->
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- TensorFlow.js để chạy model nhận diện chữ cái ASL (cam/tfjs_model) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
+  <!-- CSS Lobby -->
+  <link rel="stylesheet" href="css/ourspace.css" />
+
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!--
+    LƯU Ý: File này dùng Babel standalone để transform JSX trong trình duyệt.
+    Khi load các file .jsx qua thuộc tính `src`, cần serve qua HTTP (không
+    chạy được bằng file:// vì XHR/CORS). Trên Windows có thể chạy nhanh:
+        python -m http.server 8000
+    rồi mở http://localhost:8000/index.html
+    Các file được load theo thứ tự phụ thuộc — không đổi thứ tự bên dưới.
+  -->
+  <script type="text/babel" data-presets="react" src="js/icons.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/db.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/hooks.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/sign-engine.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/asl-engine.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/peer.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/components.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/call-room.jsx"></script>
+  <script type="text/babel" data-presets="react" src="js/app.jsx"></script>
+</body>
+</html>

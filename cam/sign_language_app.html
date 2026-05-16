@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>🤖 Nhận diện ngôn ngữ ký hiệu</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        h1 { margin-bottom: 8px; font-size: 28px; }
+        .subtitle { opacity: 0.9; font-size: 14px; }
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+        .video-section, .control-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .video-wrapper { position: relative; width: 100%; aspect-ratio: 4/3; }
+        video, canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            transform: scaleX(-1);
+        }
+        .prediction-display {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .predicted-letter {
+            font-size: 120px;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 16px;
+            color: #4ade80;
+            text-shadow: 0 4px 20px rgba(74, 222, 128, 0.5);
+            min-height: 120px;
+            transition: color 0.3s;
+        }
+        .predicted-letter.low-confidence { color: #fbbf24; }
+        .predicted-letter.no-hand {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 24px;
+            line-height: 120px;
+        }
+        .confidence-display { font-size: 14px; opacity: 0.9; margin-bottom: 12px; }
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: #4ade80;
+            width: 0%;
+            transition: width 0.2s, background-color 0.2s;
+        }
+        .word-display {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            min-height: 80px;
+        }
+        .word-label {
+            font-size: 12px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .word-text {
+            font-size: 28px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 4px;
+            min-height: 40px;
+            word-break: break-all;
+        }
+        .word-cursor {
+            display: inline-block;
+            width: 3px;
+            background: #4ade80;
+            animation: blink 1s infinite;
+            height: 28px;
+            vertical-align: middle;
+        }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+        button {
+            padding: 12px 20px;
+            font-size: 14px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        button:hover { transform: scale(1.02); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.secondary { background: rgba(255, 255, 255, 0.2); color: white; }
+        button.danger { background: rgba(239, 68, 68, 0.8); color: white; }
+        .status {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+        .status.success { background: rgba(74, 222, 128, 0.2); }
+        .status.error { background: rgba(239, 68, 68, 0.2); }
+        .status.info { background: rgba(59, 130, 246, 0.2); }
+        .info-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .info-row:last-child { margin-bottom: 0; }
+        .info-row strong { color: #4ade80; }
+        .top3 { margin-top: 12px; font-size: 12px; }
+        .top3-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .top3-letter { font-weight: bold; min-width: 20px; }
+        .top3-bar {
+            flex: 1;
+            height: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .top3-fill {
+            height: 100%;
+            background: rgba(74, 222, 128, 0.6);
+            transition: width 0.2s;
+        }
+        .top3-pct { min-width: 40px; text-align: right; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Nhận diện ngôn ngữ ký hiệu</h1>
+        <p class="subtitle">Sản phẩm cuối cùng - Real-time ASL recognition</p>
+    </div>
+
+    <div class="main">
+        <div class="video-section">
+            <div class="video-wrapper">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            <button id="startBtn" onclick="startCamera()" style="margin-top: 16px;">📷 Bật camera</button>
+            <div class="status" id="status">⏳ Đang khởi tạo... Đợi MediaPipe và model tải xong</div>
+        </div>
+
+        <div class="control-section">
+            <div class="prediction-display">
+                <div class="predicted-letter no-hand" id="predictedLetter">—</div>
+                <div class="confidence-display">
+                    Độ tin cậy: <strong id="confidenceText">0%</strong>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill"></div>
+                </div>
+                <div class="top3" id="top3Container" style="display:none;">
+                    <div style="margin-bottom: 6px; opacity: 0.7;">Top 3 dự đoán:</div>
+                    <div id="top3List"></div>
+                </div>
+            </div>
+
+            <div class="word-display">
+                <div class="word-label">Từ đang ghép</div>
+                <div class="word-text" id="wordText"><span class="word-cursor"></span></div>
+            </div>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span>Trạng thái:</span>
+                    <strong id="handStatus">Chưa thấy tay</strong>
+                </div>
+                <div class="info-row">
+                    <span>Stable count:</span>
+                    <strong id="stableCount">0 / 8</strong>
+                </div>
+                <div class="info-row">
+                    <span>Test accuracy của model:</span>
+                    <strong id="modelAccuracy">--</strong>
+                </div>
+            </div>
+
+            <button onclick="addSpace()" class="secondary">⎵ Thêm khoảng trắng</button>
+            <button onclick="deleteLastChar()" class="secondary">⌫ Xóa chữ cuối</button>
+            <button onclick="clearWord()" class="danger">🗑️ Xóa toàn bộ</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const predictedLetterEl = document.getElementById('predictedLetter');
+        const confidenceTextEl = document.getElementById('confidenceText');
+        const confidenceFillEl = document.getElementById('confidenceFill');
+        const wordTextEl = document.getElementById('wordText');
+        const handStatusEl = document.getElementById('handStatus');
+        const stableCountEl = document.getElementById('stableCount');
+        const modelAccuracyEl = document.getElementById('modelAccuracy');
+        const top3ContainerEl = document.getElementById('top3Container');
+        const top3ListEl = document.getElementById('top3List');
+
+        canvasElement.width = 640;
+        canvasElement.height = 480;
+
+        let model = null;
+        let labels = [];
+        let lastPrediction = '';
+        let stableCount = 0;
+        let currentWord = '';
+        const STABLE_THRESHOLD = 8;
+        const CONFIDENCE_THRESHOLD = 0.7;
+
+        function normalizeLandmarks(landmarks) {
+            const wrist = landmarks[0];
+            const translated = landmarks.map(p => ({
+                x: p.x - wrist.x,
+                y: p.y - wrist.y,
+                z: p.z - wrist.z
+            }));
+            let maxDist = 0;
+            translated.forEach(p => {
+                const d = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+                if (d > maxDist) maxDist = d;
+            });
+            if (maxDist === 0) maxDist = 1;
+            const normalized = [];
+            translated.forEach(p => {
+                normalized.push(p.x / maxDist);
+                normalized.push(p.y / maxDist);
+                normalized.push(p.z / maxDist);
+            });
+            return normalized;
+        }
+
+        async function predict(landmarks) {
+            if (!model) return null;
+            const normalized = normalizeLandmarks(landmarks);
+            const tensor = tf.tensor2d([normalized]);
+
+            // Graph Model dùng executeAsync
+            const predictions = await model.executeAsync(tensor);
+
+            const probs = await predictions.data();
+            tensor.dispose();
+            predictions.dispose();
+
+            const indexed = Array.from(probs).map((p, i) => ({
+                letter: labels[i],
+                prob: p
+            }));
+            indexed.sort((a, b) => b.prob - a.prob);
+
+            return {
+                top: indexed[0],
+                top3: indexed.slice(0, 3)
+            };
+        }
+
+        function updatePredictionUI(result) {
+            if (!result) {
+                predictedLetterEl.textContent = '—';
+                predictedLetterEl.className = 'predicted-letter no-hand';
+                confidenceTextEl.textContent = '0%';
+                confidenceFillEl.style.width = '0%';
+                top3ContainerEl.style.display = 'none';
+                handStatusEl.textContent = 'Chưa thấy tay';
+                return;
+            }
+
+            const conf = result.top.prob;
+            const confPct = (conf * 100).toFixed(1);
+            confidenceTextEl.textContent = confPct + '%';
+            confidenceFillEl.style.width = confPct + '%';
+
+            predictedLetterEl.textContent = result.top.letter;
+            if (conf >= CONFIDENCE_THRESHOLD) {
+                predictedLetterEl.className = 'predicted-letter';
+                confidenceFillEl.style.background = '#4ade80';
+            } else {
+                predictedLetterEl.className = 'predicted-letter low-confidence';
+                confidenceFillEl.style.background = '#fbbf24';
+            }
+
+            top3ContainerEl.style.display = 'block';
+            top3ListEl.innerHTML = '';
+            result.top3.forEach(item => {
+                const pct = (item.prob * 100).toFixed(1);
+                top3ListEl.innerHTML += `
+                    <div class="top3-item">
+                        <span class="top3-letter">${item.letter}</span>
+                        <div class="top3-bar">
+                            <div class="top3-fill" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="top3-pct">${pct}%</span>
+                    </div>
+                `;
+            });
+
+            handStatusEl.textContent = 'Đang nhận diện';
+
+            if (conf >= CONFIDENCE_THRESHOLD) {
+                if (result.top.letter === lastPrediction) {
+                    stableCount++;
+                } else {
+                    lastPrediction = result.top.letter;
+                    stableCount = 1;
+                }
+                stableCountEl.textContent = `${stableCount} / ${STABLE_THRESHOLD}`;
+
+                if (stableCount === STABLE_THRESHOLD) {
+                    if (currentWord.slice(-1) !== result.top.letter) {
+                        currentWord += result.top.letter;
+                        updateWordDisplay();
+                    }
+                }
+            } else {
+                stableCount = 0;
+                stableCountEl.textContent = `0 / ${STABLE_THRESHOLD}`;
+            }
+        }
+
+        function updateWordDisplay() {
+            wordTextEl.innerHTML = currentWord + '<span class="word-cursor"></span>';
+        }
+
+        function addSpace() { currentWord += ' '; updateWordDisplay(); }
+        function deleteLastChar() { currentWord = currentWord.slice(0, -1); updateWordDisplay(); }
+        function clearWord() { currentWord = ''; updateWordDisplay(); }
+
+        async function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+                    color: '#4ade80',
+                    lineWidth: 3
+                });
+                drawLandmarks(canvasCtx, landmarks, {
+                    color: '#ef4444',
+                    lineWidth: 2,
+                    radius: 4
+                });
+
+                const result = await predict(landmarks);
+                updatePredictionUI(result);
+            } else {
+                lastPrediction = '';
+                stableCount = 0;
+                updatePredictionUI(null);
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        hands.onResults(onResults);
+
+        async function loadModel() {
+            try {
+                statusEl.textContent = '⏳ Đang tải Graph Model...';
+                statusEl.className = 'status info';
+
+                // CHỈ dùng Graph Model (vì đã convert từ SavedModel)
+                model = await tf.loadGraphModel('./tfjs_model/model.json');
+                console.log('✅ Đã load Graph Model');
+                console.log('Model inputs:', model.inputs);
+                console.log('Model outputs:', model.outputs);
+
+                // Load labels
+                const labelsResponse = await fetch('./tfjs_model/labels.json');
+                const labelsData = await labelsResponse.json();
+                labels = labelsData.labels;
+                modelAccuracyEl.textContent = (labelsData.test_accuracy * 100).toFixed(1) + '%';
+
+                statusEl.textContent = `✅ Đã tải model với ${labels.length} chữ cái. Nhấn "Bật camera"`;
+                statusEl.className = 'status success';
+                console.log('Labels:', labels);
+                return true;
+            } catch (error) {
+                statusEl.textContent = '❌ Lỗi: ' + error.message;
+                statusEl.className = 'status error';
+                console.error('Chi tiết lỗi:', error);
+                return false;
+            }
+        }
+
+        async function startCamera() {
+            const startBtn = document.getElementById('startBtn');
+            if (!model) {
+                statusEl.textContent = '❌ Model chưa load xong. Đợi 1 chút.';
+                statusEl.className = 'status error';
+                return;
+            }
+
+            startBtn.disabled = true;
+            startBtn.textContent = '⏳ Đang khởi động camera...';
+            try {
+                const camera = new Camera(videoElement, {
+                    onFrame: async () => { await hands.send({ image: videoElement }); },
+                    width: 640, height: 480
+                });
+                await camera.start();
+                startBtn.textContent = '✅ Camera đang chạy';
+                statusEl.textContent = '🎉 Sẵn sàng! Đưa tay vào khung hình và làm chữ cái ASL';
+                statusEl.className = 'status success';
+                updateWordDisplay();
+            } catch (error) {
+                statusEl.textContent = '❌ Lỗi camera: ' + error.message;
+                statusEl.className = 'status error';
+                startBtn.disabled = false;
+                startBtn.textContent = '📷 Thử lại';
+            }
+        }
+
+        loadModel();
+    </script>
+</body>
+</html>
