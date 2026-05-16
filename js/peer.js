@@ -22,6 +22,22 @@ var usePeerConnection = (userName, localStream) => {
     setPeers({ ...peersRef.current });
   };
 
+  // Khi 1 trong 2 kênh (media call hoặc data conn) đóng, ta chỉ xoá phần đó.
+  // Chỉ remove peer entry khi cả 2 đều đã đóng. Tránh trường hợp tắt cam
+  // làm rớt luôn chat.
+  const handleCallClose = (id) => {
+    const p = peersRef.current[id];
+    if (!p) return;
+    if (p.dataConn) updatePeer(id, { stream: null, call: null });
+    else removePeer(id);
+  };
+  const handleDataClose = (id) => {
+    const p = peersRef.current[id];
+    if (!p) return;
+    if (p.call) updatePeer(id, { dataConn: null });
+    else removePeer(id);
+  };
+
   const setupDataConn = (conn) => {
     conn.on('open', () => {
       updatePeer(conn.peer, { dataConn: conn });
@@ -32,33 +48,27 @@ var usePeerConnection = (userName, localStream) => {
       else if (data.type === 'asl') updatePeer(conn.peer, { asl: data.payload });
       dataHandlersRef.current.forEach(h => h(conn.peer, data));
     });
+    conn.on('close', () => handleDataClose(conn.peer));
   };
 
   useEffect(() => {
     if (!window.Peer) { setError('PeerJS chưa load'); return; }
     setStatus('connecting');
     const myId = `ourspace-${Math.random().toString(36).substring(2, 10)}`;
+    // LƯU Ý: openrelay.metered.ca đã ngừng dịch vụ free từ ~2024 → bỏ.
+    // Hiện chỉ dùng STUN của Google + Cloudflare. Đủ cho 2 peer cùng mạng
+    // hoặc NAT thân thiện (~80% trường hợp). Cho production trên mọi mạng
+    // (4G, firewall doanh nghiệp), cần đăng ký TURN riêng:
+    //   - Cloudflare Calls (free 1TB/tháng)  https://developers.cloudflare.com/calls/
+    //   - Metered TURN free plan             https://www.metered.ca/tools/openrelay/
+    //   - Self-host coturn
     const peer = new window.Peer(myId, {
       debug: 1,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
+          { urls: 'stun:stun.cloudflare.com:3478' },
         ],
       },
     });
@@ -74,7 +84,7 @@ var usePeerConnection = (userName, localStream) => {
         console.log('🎥 Got remote stream:', call.peer);
         updatePeer(call.peer, { stream: rs, call });
       });
-      call.on('close', () => removePeer(call.peer));
+      call.on('close', () => handleCallClose(call.peer));
     });
     peer.on('connection', (conn) => {
       console.log('💬 Incoming data conn:', conn.peer);
@@ -102,7 +112,7 @@ var usePeerConnection = (userName, localStream) => {
     setupDataConn(conn);
     const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
     call.on('stream', (rs) => updatePeer(targetId, { stream: rs, call }));
-    call.on('close', () => removePeer(targetId));
+    call.on('close', () => handleCallClose(targetId));
     return true;
   }, [myPeerId]);
 

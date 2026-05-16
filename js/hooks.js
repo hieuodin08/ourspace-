@@ -83,6 +83,11 @@ var useSpeechToText = (roomId, userId, userName) => {
     rec.onerror = () => {};
     rec.onend = () => { if (listeningRef.current) { try { rec.start(); } catch(_){} } };
     recRef.current = rec;
+    // Nếu user đang listening và effect rerun (vd: đổi ngôn ngữ), tự start
+    // recognizer mới để khỏi phải bấm lại nút Type.
+    if (listeningRef.current) {
+      try { rec.start(); } catch(_){}
+    }
     return () => { try { rec.stop(); } catch(_){} };
   }, [language, roomId, userId, userName, db]);
 

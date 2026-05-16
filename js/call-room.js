@@ -27,10 +27,24 @@ var CallRoom = ({ user, onLeave }) => {
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [targetPeer, setTargetPeer] = useState('');
   const [remoteMessages, setRemoteMessages] = useState([]);
+  // Lift localMessages lên đây để khỏi mất tin khi user đổi panel chat/ASL.
+  const [localMessages, setLocalMessages] = useState([]);
 
   const handTracking = useHandTracking(localVideoRef, aslEnabled && !!media.stream);
   const asl = useASLLetterRecognition(aslEnabled ? handTracking.allLandmarks : [], aslEnabled);
   const peerConn = usePeerConnection(user.name, media.stream);
+
+  const sendChatMessage = useCallback((text) => {
+    const id = `l_${Date.now()}`;
+    const ts = Date.now();
+    setLocalMessages(p => [...p, { id, userId: user.id, userName: user.name, text, timestamp: ts }]);
+    peerConn.broadcast({ type: 'chat', userName: user.name, text, timestamp: ts });
+    return id;
+  }, [peerConn.broadcast, user.id, user.name]);
+
+  const recallChatMessage = useCallback((id) => {
+    setLocalMessages(p => p.map(m => m.id === id ? { ...m, recalled: true } : m));
+  }, []);
 
   // Giữ ref tới stream hiện tại để cleanup dùng được giá trị mới nhất
   // (tránh stale closure khi useEffect cleanup chạy lúc unmount).
@@ -110,8 +124,8 @@ var CallRoom = ({ user, onLeave }) => {
   };
 
   const handleSendSignAsMessage = (text) => {
-    setRemoteMessages(p => [...p, { id: `l_${Date.now()}`, userId: user.id, userName: user.name, text, timestamp: Date.now() }]);
-    peerConn.broadcast({ type: 'chat', userName: user.name, text, timestamp: Date.now() });
+    // Đi qua cùng pipeline với chat thường để có nút thu hồi + tránh duplicate logic.
+    sendChatMessage(text);
   };
 
   const handleLeave = () => { media.stopMedia(); stt.stop(); onLeave(); };
@@ -376,7 +390,9 @@ var CallRoom = ({ user, onLeave }) => {
                 {activePanel === 'chat' && (
                   <ChatPanel userId={user.id} userName={user.name}
                     onSpeak={(t) => tts.speak(t, stt.language)}
-                    onBroadcast={peerConn.broadcast}
+                    onSend={sendChatMessage}
+                    onRecall={recallChatMessage}
+                    localMessages={localMessages}
                     remoteMessages={remoteMessages} />
                 )}
                 {activePanel === 'asl' && (

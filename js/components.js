@@ -238,16 +238,18 @@ var Lobby = ({ onJoin, onTerms } = {}) => {
 };
 
 // ====== UI: Chat Panel ======
-var ChatPanel = ({ userId, userName, onSpeak, onBroadcast, remoteMessages }) => {
+var ChatPanel = ({ userId, userName, onSpeak, onSend, onRecall, localMessages, remoteMessages }) => {
   const [input, setInput] = useState('');
-  const [localMessages, setLocalMessages] = useState([]);
   const [justSentId, setJustSentId] = useState(null);
   const [kick, setKick] = useState(false);
   const endRef = useRef(null);
   const sentTimerRef = useRef(null);
   const kickTimerRef = useRef(null);
 
-  const allMessages = [...localMessages, ...remoteMessages].sort((a, b) => a.timestamp - b.timestamp);
+  const allMessages = useMemo(
+    () => [...localMessages, ...remoteMessages].sort((a, b) => a.timestamp - b.timestamp),
+    [localMessages, remoteMessages]
+  );
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [allMessages.length]);
 
@@ -258,11 +260,9 @@ var ChatPanel = ({ userId, userName, onSpeak, onBroadcast, remoteMessages }) => 
   }, []);
 
   const send = () => {
-    if (!input.trim()) return;
-    const id = `l_${Date.now()}`;
-    const msg = { id, userId, userName, text: input.trim(), timestamp: Date.now() };
-    setLocalMessages(p => [...p, msg]);
-    onBroadcast({ type: 'chat', userName, text: input.trim(), timestamp: Date.now() });
+    const text = input.trim();
+    if (!text) return;
+    const id = onSend(text);
     setJustSentId(id);
     setKick(true);
     setInput('');
@@ -272,9 +272,7 @@ var ChatPanel = ({ userId, userName, onSpeak, onBroadcast, remoteMessages }) => 
     kickTimerRef.current = setTimeout(() => setKick(false), 500);
   };
 
-  const recall = (id) => {
-    setLocalMessages(p => p.map(m => m.id === id ? { ...m, recalled: true } : m));
-  };
+  const recall = (id) => onRecall(id);
 
   return (
     <div className="flex flex-col h-full bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700 overflow-hidden">
