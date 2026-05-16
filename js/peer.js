@@ -55,20 +55,35 @@ var usePeerConnection = (userName, localStream) => {
     if (!window.Peer) { setError('PeerJS chưa load'); return; }
     setStatus('connecting');
     const myId = `ourspace-${Math.random().toString(36).substring(2, 10)}`;
-    // LƯU Ý: openrelay.metered.ca đã ngừng dịch vụ free từ ~2024 → bỏ.
-    // Hiện chỉ dùng STUN của Google + Cloudflare. Đủ cho 2 peer cùng mạng
-    // hoặc NAT thân thiện (~80% trường hợp). Cho production trên mọi mạng
-    // (4G, firewall doanh nghiệp), cần đăng ký TURN riêng:
-    //   - Cloudflare Calls (free 1TB/tháng)  https://developers.cloudflare.com/calls/
-    //   - Metered TURN free plan             https://www.metered.ca/tools/openrelay/
-    //   - Self-host coturn
+    // TURN: Metered.ca free tier (50GB/tháng). Bao gồm STUN + TURN trên port
+    // 80/443 (UDP và TCP) để xuyên qua NAT khắt khe (CGNAT, 4G, firewall).
+    // Quota dùng hết sẽ tự ngắt; xem usage tại https://dashboard.metered.ca
     const peer = new window.Peer(myId, {
       debug: 1,
       config: {
         iceServers: [
+          { urls: 'stun:stun.relay.metered.ca:80' },
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun.cloudflare.com:3478' },
+          {
+            urls: 'turn:global.relay.metered.ca:80',
+            username: '913cdb003505fa2ab459dba7',
+            credential: 'qosAoeJ/BWc8NmWx',
+          },
+          {
+            urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+            username: '913cdb003505fa2ab459dba7',
+            credential: 'qosAoeJ/BWc8NmWx',
+          },
+          {
+            urls: 'turn:global.relay.metered.ca:443',
+            username: '913cdb003505fa2ab459dba7',
+            credential: 'qosAoeJ/BWc8NmWx',
+          },
+          {
+            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+            username: '913cdb003505fa2ab459dba7',
+            credential: 'qosAoeJ/BWc8NmWx',
+          },
         ],
       },
     });
