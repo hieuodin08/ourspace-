@@ -214,10 +214,13 @@ var CallRoom = ({ user, onLeave }) => {
                 </div>
               )}
 
-              {/* Remote video full-bleed — luôn hiển thị, không phụ thuộc local stream */}
-              {firstPeer ? (
+              {/* Remote video — luôn hiển thị khi có peer, không cần local stream */}
+              {firstPeer && (
                 <RemoteVideo peerId={firstPeer[0]} peerData={firstPeer[1]} showLandmarks={showLandmarks} />
-              ) : (
+              )}
+
+              {/* Màn hình chờ — chỉ khi đã có stream nhưng chưa có ai gọi */}
+              {!firstPeer && media.stream && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
                   <Users className="w-16 h-16 text-slate-600 mb-3" />
                   <p className="text-slate-300 text-center font-semibold mb-2">Chưa có ai khác</p>
