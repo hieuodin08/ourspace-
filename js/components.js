@@ -59,13 +59,12 @@ var Lobby = ({ onJoin, onTerms } = {}) => {
         }
         const res = await registerUser(db, { username, email, password, displayName: username });
         if (!res.ok) { setError(res.error); return; }
-        saveSession(db, res.user);
-        onJoin?.({ id: res.user.id, name: res.user.displayName || res.user.username });
+        // Firebase tự kích hoạt onAuthStateChanged → App sẽ chuyển màn hình.
+        onJoin?.(res.user);
       } else {
         const res = await loginUser(db, { login, password });
         if (!res.ok) { setError(res.error); return; }
-        saveSession(db, res.user);
-        onJoin?.({ id: res.user.id, name: res.user.displayName || res.user.username });
+        onJoin?.(res.user);
       }
     } catch (err) {
       setError('Có lỗi xảy ra: ' + (err?.message || 'Vui lòng thử lại'));
@@ -186,7 +185,7 @@ var Lobby = ({ onJoin, onTerms } = {}) => {
               <label htmlFor="password">Mật khẩu</label>
               <input
                 type="password" id="password" name="password"
-                placeholder={isSignup ? 'Tối thiểu 4 ký tự' : 'Nhập mật khẩu'}
+                placeholder={isSignup ? 'Tối thiểu 6 ký tự' : 'Nhập mật khẩu'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={isSignup ? 'new-password' : 'current-password'}

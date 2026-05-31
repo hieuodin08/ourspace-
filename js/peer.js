@@ -4,11 +4,13 @@ var usePeerConnection = (userName, localStream) => {
   const [myPeerId, setMyPeerId] = useState(null);
   const [error, setError] = useState(null);
   const [peers, setPeers] = useState({});
+  const [incomingTick, setIncomingTick] = useState(0); // tăng mỗi khi có cuộc gọi đến
   const peerRef = useRef(null);
   const peersRef = useRef({});
   const streamRef = useRef(null);
   const userNameRef = useRef(userName);
   const dataHandlersRef = useRef([]);
+  const pendingCallsRef = useRef([]); // cuộc gọi đến chưa trả lời (đợi có camera)
 
   useEffect(() => { streamRef.current = localStream; }, [localStream]);
   useEffect(() => { userNameRef.current = userName; }, [userName]);
@@ -94,12 +96,10 @@ var usePeerConnection = (userName, localStream) => {
     });
     peer.on('call', (call) => {
       console.log('📞 Incoming call:', call.peer);
-      call.answer(streamRef.current || new MediaStream());
-      call.on('stream', (rs) => {
-        console.log('🎥 Got remote stream:', call.peer);
-        updatePeer(call.peer, { stream: rs, call });
-      });
-      call.on('close', () => handleCallClose(call.peer));
+      // KHÔNG trả lời ngay — xếp vào hàng đợi để App bật camera trước rồi mới
+      // answer (tránh trả lời với stream rỗng làm đối phương không thấy hình).
+      pendingCallsRef.current.push(call);
+      setIncomingTick(t => t + 1);
     });
     peer.on('connection', (conn) => {
       console.log('💬 Incoming data conn:', conn.peer);
@@ -107,6 +107,9 @@ var usePeerConnection = (userName, localStream) => {
     });
     peer.on('error', (err) => {
       console.error('Peer error:', err);
+      // Lỗi tạm thời (gọi người đang offline, mạng chập chờn) — đừng hạ trạng
+      // thái kết nối của chính mình, chỉ log.
+      if (err?.type === 'peer-unavailable' || err?.type === 'network') return;
       setError(err.message); setStatus('error');
     });
 
@@ -131,6 +134,28 @@ var usePeerConnection = (userName, localStream) => {
     return true;
   }, [myPeerId]);
 
+  // Trả lời mọi cuộc gọi đang chờ bằng stream hiện có (gọi khi camera đã sẵn sàng).
+  const answerPending = useCallback((stream) => {
+    const calls = pendingCallsRef.current;
+    pendingCallsRef.current = [];
+    calls.forEach((call) => {
+      try { call.answer(stream || new MediaStream()); } catch(_){}
+      call.on('stream', (rs) => updatePeer(call.peer, { stream: rs, call }));
+      call.on('close', () => handleCallClose(call.peer));
+    });
+  }, []);
+
+  // Cúp toàn bộ cuộc gọi/kênh dữ liệu hiện tại nhưng GIỮ peer sống để vẫn nhận
+  // được cuộc gọi mới (dùng khi rời phòng gọi quay về Home).
+  const hangUpAll = useCallback(() => {
+    Object.values(peersRef.current).forEach(p => {
+      try { p.call?.close(); } catch(_){}
+      try { p.dataConn?.close(); } catch(_){}
+    });
+    peersRef.current = {};
+    setPeers({});
+  }, []);
+
   const broadcast = useCallback((data) => {
     Object.values(peersRef.current).forEach(p => {
       if (p.dataConn?.open) { try { p.dataConn.send(data); } catch(_){} }
@@ -142,5 +167,5 @@ var usePeerConnection = (userName, localStream) => {
     return () => { dataHandlersRef.current = dataHandlersRef.current.filter(h => h !== handler); };
   }, []);
 
-  return { status, myPeerId, error, peers, connectTo, broadcast, onData };
+  return { status, myPeerId, error, peers, incomingTick, connectTo, broadcast, onData, hangUpAll, answerPending };
 };
