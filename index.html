@@ -17,6 +17,13 @@
   <!-- TensorFlow.js để chạy model nhận diện chữ cái ASL (cam/tfjs_model) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 
+  <!-- Firebase (compat) — Auth + Firestore để chat/danh bạ đồng bộ mọi thiết bị -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Cấu hình Firebase của bạn (chạy trước các script babel) -->
+  <script src="js/firebase-config.js"></script>
+
   <!-- CSS Lobby -->
   <link rel="stylesheet" href="css/ourspace.css" />
 
@@ -36,12 +43,14 @@
     Các file được load theo thứ tự phụ thuộc — không đổi thứ tự bên dưới.
   -->
   <script type="text/babel" data-presets="react" src="js/icons.js"></script>
+  <script type="text/babel" data-presets="react" src="js/firebase.js"></script>
   <script type="text/babel" data-presets="react" src="js/db.js"></script>
   <script type="text/babel" data-presets="react" src="js/hooks.js"></script>
   <script type="text/babel" data-presets="react" src="js/sign-engine.js"></script>
   <script type="text/babel" data-presets="react" src="js/asl-engine.js"></script>
   <script type="text/babel" data-presets="react" src="js/peer.js"></script>
   <script type="text/babel" data-presets="react" src="js/components.js"></script>
+  <script type="text/babel" data-presets="react" src="js/home.js"></script>
   <script type="text/babel" data-presets="react" src="js/call-room.js"></script>
   <script type="text/babel" data-presets="react" src="js/app.js"></script>
 </body>

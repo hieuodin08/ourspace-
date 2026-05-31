@@ -13,8 +13,10 @@ var WaveBackground = () => (
 );
 
 // ====== UI: Main Room ======
-var CallRoom = ({ user, onLeave }) => {
-  const media = useMedia();
+// media + peerConn được nâng lên cấp App (xem app.js) và truyền vào qua props,
+// để PeerJS luôn lắng nghe cuộc gọi đến kể cả khi đang ở màn hình chat/danh bạ.
+// callTarget: peerId cần tự động gọi khi vừa vào phòng (cuộc gọi đi).
+var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
   const stt = useSpeechToText('global', user.id, user.name);
   const tts = useTextToSpeech();
   const visualAlert = useVisualAlerts();
@@ -32,7 +34,25 @@ var CallRoom = ({ user, onLeave }) => {
 
   const handTracking = useHandTracking(localVideoRef, aslEnabled && !!media.stream);
   const asl = useASLLetterRecognition(aslEnabled ? handTracking.allLandmarks : [], aslEnabled);
-  const peerConn = usePeerConnection(user.name, media.stream);
+
+  // Tự bật camera khi vào phòng.
+  useEffect(() => { if (!media.stream && !media.isStarting && !media.error) media.startMedia(); }, []);
+
+  // Cuộc gọi ĐI: chỉ gọi tới callTarget sau khi đã có camera để đối phương thấy hình.
+  const dialedRef = useRef(false);
+  useEffect(() => {
+    if (callTarget && !dialedRef.current && peerConn.status === 'connected' && media.stream) {
+      dialedRef.current = true;
+      peerConn.connectTo(callTarget);
+    }
+  }, [callTarget, peerConn.status, media.stream]);
+
+  // Cuộc gọi ĐẾN: trả lời các cuộc đang chờ khi camera đã sẵn sàng (hoặc khi
+  // user từ chối cấp camera thì vẫn trả lời để cuộc gọi không bị treo).
+  useEffect(() => {
+    if (media.stream) peerConn.answerPending(media.stream);
+    else if (media.error) peerConn.answerPending(null);
+  }, [media.stream, media.error, peerConn.incomingTick]);
 
   const sendChatMessage = useCallback((text) => {
     const id = `l_${Date.now()}`;
@@ -44,15 +64,6 @@ var CallRoom = ({ user, onLeave }) => {
 
   const recallChatMessage = useCallback((id) => {
     setLocalMessages(p => p.map(m => m.id === id ? { ...m, recalled: true } : m));
-  }, []);
-
-  // Giữ ref tới stream hiện tại để cleanup dùng được giá trị mới nhất
-  // (tránh stale closure khi useEffect cleanup chạy lúc unmount).
-  const streamForCleanupRef = useRef(null);
-  useEffect(() => { streamForCleanupRef.current = media.stream; }, [media.stream]);
-  useEffect(() => () => {
-    const s = streamForCleanupRef.current;
-    if (s) s.getTracks().forEach(t => t.stop());
   }, []);
 
   useEffect(() => {
@@ -128,7 +139,8 @@ var CallRoom = ({ user, onLeave }) => {
     sendChatMessage(text);
   };
 
-  const handleLeave = () => { media.stopMedia(); stt.stop(); onLeave(); };
+  // Kết thúc cuộc gọi → quay về Home (App lo việc tắt cam + ngắt peer).
+  const handleLeave = () => { stt.stop(); onExitCall(); };
   const remotePeers = Object.entries(peerConn.peers);
   const firstPeer = remotePeers[0];
   const panelMode = activePanel === 'chat' ? 'chat' : 'signs';

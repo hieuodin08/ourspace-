@@ -54,58 +54,6 @@ var DB = createDB();
 var DBContext = createContext(DB);
 var useDB = () => useContext(DBContext);
 
-// ====== AUTH helpers ======
-var SALT = 'silenttalk_v1_salt';
-var sha256 = async (text) => {
-  const buf = new TextEncoder().encode(text);
-  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
-  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-};
-var hashPassword = async (pwd) => sha256(SALT + ':' + pwd);
-
-var findUserByLogin = (db, login) => {
-  const key = (login || '').trim().toLowerCase();
-  if (!key) return null;
-  return db.getAll('users').find(u =>
-    (u.username || '').toLowerCase() === key ||
-    (u.email || '').toLowerCase() === key
-  ) || null;
-};
-
-var registerUser = async (db, { username, email, password, displayName }) => {
-  const u = (username || '').trim();
-  const e = (email || '').trim().toLowerCase();
-  const p = password || '';
-  if (!u) return { ok: false, error: 'Tên đăng nhập không được để trống' };
-  if (u.length < 3) return { ok: false, error: 'Tên đăng nhập tối thiểu 3 ký tự' };
-  if (p.length < 4) return { ok: false, error: 'Mật khẩu tối thiểu 4 ký tự' };
-  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: 'Email không hợp lệ' };
-  if (findUserByLogin(db, u)) return { ok: false, error: 'Tên đăng nhập đã tồn tại' };
-  if (e && findUserByLogin(db, e)) return { ok: false, error: 'Email đã được sử dụng' };
-
-  const id = `u_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  const passwordHash = await hashPassword(p);
-  const user = {
-    id, username: u, email: e, displayName: (displayName || u).trim(),
-    passwordHash, createdAt: Date.now(),
-  };
-  db.set('users', id, user);
-  return { ok: true, user };
-};
-
-var loginUser = async (db, { login, password }) => {
-  const user = findUserByLogin(db, login);
-  if (!user) return { ok: false, error: 'Tài khoản không tồn tại' };
-  const hash = await hashPassword(password || '');
-  if (hash !== user.passwordHash) return { ok: false, error: 'Mật khẩu không đúng' };
-  return { ok: true, user };
-};
-
-var saveSession = (db, user) => db.set('session', 'current', { userId: user.id, name: user.displayName || user.username });
-var loadSession = (db) => {
-  const s = db.get('session', 'current');
-  if (!s?.userId) return null;
-  const u = db.get('users', s.userId);
-  return u ? { id: u.id, name: u.displayName || u.username } : null;
-};
-var clearSession = (db) => db.delete('session', 'current');
+// LƯU Ý: Xác thực (đăng ký/đăng nhập), danh bạ và tin nhắn nay do Firebase
+// đảm nhiệm — xem js/firebase.js. DB ở trên chỉ còn dùng cho dữ liệu cục bộ
+// (vd: transcripts của Speech-to-Text trong phòng gọi).
