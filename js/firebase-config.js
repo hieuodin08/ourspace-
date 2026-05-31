@@ -19,12 +19,13 @@
 // ============================================================================
 
 window.OURSPACE_FIREBASE_CONFIG = {
-  apiKey: "DAN_API_KEY_CUA_BAN_VAO_DAY",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxxxxxx",
+  apiKey: "AIzaSyBiP63AIcOmWllP_suNYV2KdshVsU0QnzI",
+  authDomain: "our-space-6404b.firebaseapp.com",
+  projectId: "our-space-6404b",
+  storageBucket: "our-space-6404b.firebasestorage.app",
+  messagingSenderId: "709452238055",
+  appId: "1:709452238055:web:32d83251c0e04711156642",
+  measurementId: "G-Q4SWQ0QLJ3",
 };
 
 // ----------------------------------------------------------------------------
