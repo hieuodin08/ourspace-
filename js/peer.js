@@ -54,6 +54,20 @@ var usePeerConnection = (userName, localStream) => {
     conn.on('close', () => handleDataClose(conn.peer));
   };
 
+  // Chẩn đoán: in trạng thái ICE/kết nối WebRTC ra console để biết media có
+  // thật sự nối được không (failed = lỗi TURN/mạng, connected = OK).
+  const watchIce = (call, label) => {
+    const attach = () => {
+      const pc = call.peerConnection;
+      if (!pc) { setTimeout(attach, 300); return; }
+      const log = () => console.log(`[ICE ${label} ${call.peer}] ice=${pc.iceConnectionState} conn=${pc.connectionState}`);
+      pc.addEventListener('iceconnectionstatechange', log);
+      pc.addEventListener('connectionstatechange', log);
+      log();
+    };
+    try { attach(); } catch(_){}
+  };
+
   useEffect(() => {
     if (!window.Peer) { setError('PeerJS chưa load'); return; }
     setStatus('connecting');
@@ -138,7 +152,8 @@ var usePeerConnection = (userName, localStream) => {
     const conn = peerRef.current.connect(targetId, { reliable: true });
     setupDataConn(conn);
     const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
-    call.on('stream', (rs) => updatePeer(targetId, { stream: rs, call }));
+    watchIce(call, 'caller');
+    call.on('stream', (rs) => { console.log('🎥 Nhận được hình từ', targetId); updatePeer(targetId, { stream: rs, call }); });
     call.on('close', () => handleCallClose(targetId));
     return true;
   }, [myPeerId]);
@@ -149,8 +164,10 @@ var usePeerConnection = (userName, localStream) => {
     pendingCallsRef.current = [];
     setIncomingCallPeer(null);
     calls.forEach((call) => {
+      console.log('✅ Trả lời cuộc gọi từ', call.peer, '— có camera:', !!stream);
       try { call.answer(stream || new MediaStream()); } catch(_){}
-      call.on('stream', (rs) => updatePeer(call.peer, { stream: rs, call }));
+      watchIce(call, 'callee');
+      call.on('stream', (rs) => { console.log('🎥 Nhận được hình từ', call.peer); updatePeer(call.peer, { stream: rs, call }); });
       call.on('close', () => handleCallClose(call.peer));
     });
   }, []);

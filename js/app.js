@@ -108,7 +108,12 @@ var MainApp = ({ profile, setProfile, onLogout }) => {
 
   // Có cuộc gọi đến → KHÔNG tự vào phòng nữa. App hiện màn hình "Cuộc gọi đến"
   // (IncomingCallScreen) để người nhận chủ động bấm Nghe hoặc Từ chối.
-  const acceptIncomingCall = useCallback(() => { setView('call'); }, []);
+  const acceptIncomingCall = useCallback(() => {
+    // Gọi getUserMedia NGAY trong sự kiện chạm "Nghe" để trình duyệt di động
+    // chịu mở camera (nhiều trình duyệt chặn nếu không gắn với cử chỉ người dùng).
+    if (!media.stream && !media.isStarting) media.startMedia();
+    setView('call');
+  }, [media.stream, media.isStarting, media.startMedia]);
   const rejectIncomingCall = useCallback(() => { peerConn.rejectIncoming(); }, [peerConn.rejectIncoming]);
   const incomingName = peerConn.incomingCallPeer
     ? (peerConn.peers[peerConn.incomingCallPeer]?.name || 'Người dùng')
