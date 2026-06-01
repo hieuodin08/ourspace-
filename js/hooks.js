@@ -60,6 +60,7 @@ var useSpeechToText = (roomId, userId, userName) => {
   const [supported, setSupported] = useState(true);
   const recRef = useRef(null);
   const listeningRef = useRef(false);
+  const fatalRef = useRef(false); // gặp lỗi không phục hồi → ngừng tự khởi động lại
   const db = useDB();
 
   useEffect(() => {
@@ -80,12 +81,23 @@ var useSpeechToText = (roomId, userId, userName) => {
       }
       setInterim(inter);
     };
-    rec.onerror = () => {};
-    rec.onend = () => { if (listeningRef.current) { try { rec.start(); } catch(_){} } };
+    rec.onerror = (e) => {
+      const err = e?.error || '';
+      // Lỗi không phục hồi (chưa cấp quyền mic, dịch vụ giọng nói của Google
+      // không khả dụng trên thiết bị — hay gặp trên điện thoại) → DỪNG HẲN,
+      // không tự khởi động lại để tránh báo lỗi "Google..." lặp đi lặp lại.
+      if (['not-allowed', 'service-not-allowed', 'audio-capture', 'network'].includes(err)) {
+        fatalRef.current = true;
+        listeningRef.current = false;
+        setIsListening(false);
+        if (err !== 'network') setSupported(false);
+      }
+    };
+    rec.onend = () => { if (listeningRef.current && !fatalRef.current) { try { rec.start(); } catch(_){} } };
     recRef.current = rec;
     // Nếu user đang listening và effect rerun (vd: đổi ngôn ngữ), tự start
     // recognizer mới để khỏi phải bấm lại nút Type.
-    if (listeningRef.current) {
+    if (listeningRef.current && !fatalRef.current) {
       try { rec.start(); } catch(_){}
     }
     return () => { try { rec.stop(); } catch(_){} };
@@ -93,6 +105,7 @@ var useSpeechToText = (roomId, userId, userName) => {
 
   const start = useCallback(() => {
     if (recRef.current && !listeningRef.current) {
+      fatalRef.current = false; // người dùng chủ động bật lại → cho phép thử lại
       try { recRef.current.start(); listeningRef.current = true; setIsListening(true); } catch(_){}
     }
   }, []);
