@@ -43,6 +43,32 @@ var Toast = ({ text }) => (
   ) : null
 );
 
+// ====== Màn hình "Cuộc gọi đến" (chuông + Nghe / Từ chối) ======
+var IncomingCallScreen = ({ peerId, name, onAccept, onReject }) => (
+  <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center text-white"
+       style={{ background: 'linear-gradient(135deg, #0a1f4a 0%, #051030 45%, #020817 100%)' }}>
+    <div className="mb-6 animate-pulse">
+      <Avatar name={name} color={colorForUid(peerId)} size={120} />
+    </div>
+    <div className="text-2xl font-bold mb-1">{name}</div>
+    <div className="text-slate-400 mb-16">Cuộc gọi video đến…</div>
+    <div className="flex items-center gap-16">
+      <button onClick={onReject} className="flex flex-col items-center gap-2">
+        <span className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center shadow-lg transition">
+          <PhoneOff className="w-7 h-7 text-white" />
+        </span>
+        <span className="text-sm text-red-300">Từ chối</span>
+      </button>
+      <button onClick={onAccept} className="flex flex-col items-center gap-2">
+        <span className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center shadow-lg animate-bounce">
+          <Phone className="w-7 h-7 text-white" />
+        </span>
+        <span className="text-sm text-emerald-300">Nghe</span>
+      </button>
+    </div>
+  </div>
+);
+
 // ====== Ứng dụng chính sau khi đăng nhập ======
 // Nâng media + PeerJS lên đây để vừa nhận cuộc gọi đến (kể cả khi đang xem chat)
 // vừa gọi đi từ danh bạ. Điều hướng giữa Home và phòng gọi.
@@ -80,10 +106,13 @@ var MainApp = ({ profile, setProfile, onLogout }) => {
     setView('home');
   }, [peerConn.hangUpAll, media.stopMedia]);
 
-  // Có cuộc gọi đến → vào phòng gọi (CallRoom sẽ bật camera rồi trả lời).
-  useEffect(() => {
-    if (peerConn.incomingTick > 0) setView(v => v === 'home' ? 'call' : v);
-  }, [peerConn.incomingTick]);
+  // Có cuộc gọi đến → KHÔNG tự vào phòng nữa. App hiện màn hình "Cuộc gọi đến"
+  // (IncomingCallScreen) để người nhận chủ động bấm Nghe hoặc Từ chối.
+  const acceptIncomingCall = useCallback(() => { setView('call'); }, []);
+  const rejectIncomingCall = useCallback(() => { peerConn.rejectIncoming(); }, [peerConn.rejectIncoming]);
+  const incomingName = peerConn.incomingCallPeer
+    ? (peerConn.peers[peerConn.incomingCallPeer]?.name || 'Người dùng')
+    : '';
 
   // Theo dõi kết nối: đối phương cúp máy (peers về rỗng sau khi đã có) → về Home.
   const peerCount = Object.keys(peerConn.peers).length;
@@ -137,6 +166,15 @@ var MainApp = ({ profile, setProfile, onLogout }) => {
           peerConn={peerConn}
           callTarget={callTarget}
           onExitCall={exitCall}
+        />
+      )}
+
+      {peerConn.incomingCallPeer && view !== 'call' && (
+        <IncomingCallScreen
+          peerId={peerConn.incomingCallPeer}
+          name={incomingName}
+          onAccept={acceptIncomingCall}
+          onReject={rejectIncomingCall}
         />
       )}
 

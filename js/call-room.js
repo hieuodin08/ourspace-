@@ -111,9 +111,12 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
       if (data.type === 'chat') {
         setRemoteMessages(p => [...p, { id: `r_${Date.now()}_${Math.random()}`, userId: peerId, userName: data.userName, text: data.text, timestamp: data.timestamp }]);
         visualAlert.alert();
+      } else if (data.type === 'call-ended') {
+        // Người được gọi đã Từ chối (hoặc cúp máy) → thoát phòng ngay.
+        onExitCall();
       }
     });
-  }, [peerConn.onData, visualAlert]);
+  }, [peerConn.onData, visualAlert, onExitCall]);
 
   const copiedTimerRef = useRef(null);
   useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);

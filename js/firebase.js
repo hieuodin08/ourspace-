@@ -67,7 +67,8 @@ var registerUser = async (_db, { username, email, password, displayName }) => {
   if (u.length < 3) return { ok: false, error: 'Tên đăng nhập tối thiểu 3 ký tự' };
   if (!/^[a-z0-9_.]+$/i.test(u)) return { ok: false, error: 'Tên đăng nhập chỉ gồm chữ, số, dấu _ hoặc .' };
   if (p.length < 6) return { ok: false, error: 'Mật khẩu tối thiểu 6 ký tự' };
-  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: 'Email không hợp lệ' };
+  if (!e) return { ok: false, error: 'Email không được để trống' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, error: 'Email không hợp lệ' };
 
   try {
     // Username phải là duy nhất
@@ -75,8 +76,10 @@ var registerUser = async (_db, { username, email, password, displayName }) => {
     const nameSnap = await nameRef.get();
     if (nameSnap.exists) return { ok: false, error: 'Tên đăng nhập đã tồn tại' };
 
-    // Firebase Auth cần email — nếu user không nhập thì tạo email nội bộ.
-    const authEmail = e || `${uLower}@ourspace.app`;
+    // Email là bắt buộc → dùng trực tiếp làm email đăng nhập Firebase.
+    // Firebase Auth tự đảm bảo mỗi email chỉ tạo được 1 tài khoản
+    // (ném auth/email-already-in-use nếu trùng) → chặn 1 Gmail tạo nhiều acc.
+    const authEmail = e;
     const cred = await fbAuth.createUserWithEmailAndPassword(authEmail, p);
     const uid = cred.user.uid;
 
@@ -98,7 +101,7 @@ var registerUser = async (_db, { username, email, password, displayName }) => {
     return { ok: true, user: profile };
   } catch (err) {
     const code = err?.code || '';
-    if (code === 'auth/email-already-in-use') return { ok: false, error: 'Email/tên đăng nhập đã được dùng' };
+    if (code === 'auth/email-already-in-use') return { ok: false, error: 'Email này đã được dùng cho một tài khoản khác' };
     if (code === 'auth/weak-password') return { ok: false, error: 'Mật khẩu quá yếu (tối thiểu 6 ký tự)' };
     if (code === 'auth/invalid-email') return { ok: false, error: 'Email không hợp lệ' };
     return { ok: false, error: err?.message || 'Đăng ký thất bại' };
@@ -164,25 +167,95 @@ var fbFindByUsername = async (username) => {
   return snap.empty ? null : snap.docs[0].data();
 };
 
-// ---- Danh bạ ----
-var fbAddContact = async (myUid, contactUid) => {
-  if (myUid === contactUid) return { ok: false, error: 'Không thể tự thêm chính mình' };
-  await fbStore.collection('users').doc(myUid).collection('contacts').doc(contactUid)
-    .set({ contactUid, addedAt: Date.now() });
-  return { ok: true };
-};
-var fbRemoveContact = async (myUid, contactUid) => {
-  await fbStore.collection('users').doc(myUid).collection('contacts').doc(contactUid).delete();
+// ---- Kết bạn (friendships) — mô hình lời mời 2 chiều kiểu Zalo ----
+// 1 document /friendships/{pairId} cho mỗi cặp người dùng (pairId ổn định cho
+// cả 2 phía). status: 'pending' (đang chờ duyệt) | 'accepted' (đã là bạn).
+// requestedBy = uid người GỬI lời mời → người kia mới có quyền duyệt/từ chối.
+// Dùng memberMap để query 1 lần rồi tách phía client (khỏi cần composite index),
+// giống cách conversations đang làm.
+
+// Lấy trạng thái quan hệ giữa 2 người (null nếu chưa có).
+var fbGetFriendship = async (a, b) => {
+  const snap = await fbStore.collection('friendships').doc(convIdOf(a, b)).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
 };
 
-// Lắng nghe danh bạ realtime; cb nhận mảng hồ sơ đầy đủ. Trả về hàm huỷ.
-var fbSubscribeContacts = (myUid, cb) => {
-  return fbStore.collection('users').doc(myUid).collection('contacts')
+// Gửi lời mời kết bạn. me/target là hồ sơ đầy đủ {uid, displayName, avatarColor, username}.
+var fbSendFriendRequest = async (me, target) => {
+  if (!me || !target) return { ok: false, error: 'Thiếu thông tin người dùng' };
+  if (me.uid === target.uid) return { ok: false, error: 'Không thể tự kết bạn với chính mình' };
+  const pairId = convIdOf(me.uid, target.uid);
+  const ref = fbStore.collection('friendships').doc(pairId);
+  const snap = await ref.get();
+  if (snap.exists) {
+    const d = snap.data();
+    if (d.status === 'accepted') return { ok: false, error: 'Hai bạn đã là bạn bè' };
+    if (d.requestedBy === me.uid) return { ok: false, error: 'Bạn đã gửi lời mời, đang chờ duyệt' };
+    // Người kia đã gửi lời mời cho mình trước đó → coi như mình đồng ý luôn.
+    await ref.update({ status: 'accepted', updatedAt: Date.now() });
+    return { ok: true, autoAccepted: true };
+  }
+  await ref.set({
+    members: [me.uid, target.uid],
+    memberMap: { [me.uid]: true, [target.uid]: true },
+    memberInfo: {
+      [me.uid]: { name: me.displayName, color: me.avatarColor, username: me.username || '' },
+      [target.uid]: { name: target.displayName, color: target.avatarColor, username: target.username || '' },
+    },
+    status: 'pending',
+    requestedBy: me.uid,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+  return { ok: true };
+};
+
+var fbAcceptFriendRequest = async (pairId) => {
+  await fbStore.collection('friendships').doc(pairId).update({ status: 'accepted', updatedAt: Date.now() });
+};
+// Từ chối lời mời / huỷ lời mời đã gửi / huỷ kết bạn → đều xoá document.
+var fbDeleteFriendship = async (pairId) => {
+  await fbStore.collection('friendships').doc(pairId).delete();
+};
+
+// Lắng nghe mọi quan hệ của tôi, tách sẵn thành { friends, incoming, outgoing }.
+//   friends   : đã là bạn (kèm hồ sơ mới nhất để có peerId mà gọi)
+//   incoming  : lời mời người khác gửi đến → tôi duyệt/từ chối
+//   outgoing  : lời mời tôi đã gửi đi → đang chờ
+var fbSubscribeFriendships = (myUid, cb) => {
+  return fbStore.collection('friendships')
+    .where('memberMap.' + myUid, '==', true)
     .onSnapshot(async (snap) => {
-      const uids = snap.docs.map(d => d.data().contactUid);
-      const profiles = await Promise.all(uids.map(u => fbGetProfile(u).catch(() => null)));
-      cb(profiles.filter(Boolean));
-    }, (err) => { console.error('contacts:', err); cb([]); });
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const accepted = docs.filter(d => d.status === 'accepted');
+      const pending = docs.filter(d => d.status === 'pending');
+
+      const friends = (await Promise.all(accepted.map(async (d) => {
+        const otherUid = (d.members || []).find(u => u !== myUid);
+        if (!otherUid) return null;
+        const p = await fbGetProfile(otherUid).catch(() => null);
+        const info = (d.memberInfo && d.memberInfo[otherUid]) || {};
+        if (p) return { ...p, pairId: d.id };
+        return { uid: otherUid, displayName: info.name || 'Người dùng',
+                 avatarColor: info.color || colorForUid(otherUid), username: info.username || '', pairId: d.id };
+      }))).filter(Boolean);
+
+      const incoming = pending.filter(d => d.requestedBy !== myUid).map(d => {
+        const fromUid = d.requestedBy;
+        const info = (d.memberInfo && d.memberInfo[fromUid]) || {};
+        return { pairId: d.id, uid: fromUid, displayName: info.name || 'Người dùng',
+                 avatarColor: info.color || colorForUid(fromUid), username: info.username || '' };
+      });
+
+      const outgoing = pending.filter(d => d.requestedBy === myUid).map(d => {
+        const toUid = (d.members || []).find(u => u !== myUid);
+        const info = (d.memberInfo && d.memberInfo[toUid]) || {};
+        return { pairId: d.id, uid: toUid, displayName: info.name || 'Người dùng',
+                 avatarColor: info.color || colorForUid(toUid), username: info.username || '' };
+      });
+
+      cb({ friends, incoming, outgoing });
+    }, (err) => { console.error('friendships:', err); cb({ friends: [], incoming: [], outgoing: [] }); });
 };
 
 // ---- Hội thoại ----

@@ -153,25 +153,40 @@ var ChatThread = ({ profile, other, onBack, onCall, peerStatus }) => {
 var AddContactModal = ({ profile, onClose, onAdded }) => {
   const [q, setQ] = useState('');
   const [result, setResult] = useState(undefined); // undefined=chưa tìm, null=ko thấy
+  const [relation, setRelation] = useState('none'); // none | pending-out | pending-in | friends
   const [searching, setSearching] = useState(false);
+  const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState('');
 
   const search = async () => {
     const term = q.trim();
     if (!term) return;
-    setSearching(true); setMsg(''); setResult(undefined);
+    setSearching(true); setMsg(''); setResult(undefined); setRelation('none');
     try {
       const found = await fbFindByUsername(term);
       if (found && found.uid === profile.uid) { setResult(null); setMsg('Đây là chính bạn 🙂'); }
-      else setResult(found || null);
+      else if (found) {
+        setResult(found);
+        const fr = await fbGetFriendship(profile.uid, found.uid).catch(() => null);
+        if (fr?.status === 'accepted') setRelation('friends');
+        else if (fr?.status === 'pending') setRelation(fr.requestedBy === profile.uid ? 'pending-out' : 'pending-in');
+        else setRelation('none');
+      } else setResult(null);
     } catch (e) { setMsg('Lỗi tìm kiếm: ' + (e?.message || '')); }
     finally { setSearching(false); }
   };
 
-  const add = async (user) => {
-    const res = await fbAddContact(profile.uid, user.uid);
-    if (res.ok) { onAdded?.(user); onClose(); }
-    else setMsg(res.error || 'Không thêm được');
+  // Gửi lời mời (nếu người kia đã gửi cho mình trước thì coi như đồng ý luôn).
+  const sendReq = async (user) => {
+    setSending(true); setMsg('');
+    try {
+      const res = await fbSendFriendRequest(profile, user);
+      if (res.ok) {
+        onAdded?.(user);
+        setMsg(res.autoAccepted ? 'Đã trở thành bạn bè 🎉' : 'Đã gửi lời mời kết bạn ✓');
+        setRelation(res.autoAccepted ? 'friends' : 'pending-out');
+      } else setMsg(res.error || 'Không gửi được lời mời');
+    } finally { setSending(false); }
   };
 
   return (
@@ -202,10 +217,22 @@ var AddContactModal = ({ profile, onClose, onAdded }) => {
               <div className="font-semibold truncate">{result.displayName}</div>
               <div className="text-xs text-slate-400 truncate">@{result.username}</div>
             </div>
-            <button onClick={() => add(result)}
-              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-semibold flex items-center gap-1">
-              <Plus className="w-4 h-4" /> Thêm
-            </button>
+            {relation === 'friends' ? (
+              <span className="px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1 bg-slate-700/60 text-emerald-300">
+                <Check className="w-4 h-4" /> Bạn bè
+              </span>
+            ) : relation === 'pending-out' ? (
+              <span className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-700/60 text-slate-300">
+                Đã gửi lời mời
+              </span>
+            ) : (
+              <button onClick={() => sendReq(result)} disabled={sending}
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-lg text-sm font-semibold flex items-center gap-1">
+                {sending ? <Loader className="w-4 h-4 animate-spin" />
+                  : relation === 'pending-in' ? <Check className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                {relation === 'pending-in' ? 'Đồng ý' : 'Kết bạn'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -246,7 +273,7 @@ var MessagesTab = ({ profile, conversations, onOpen }) => (
 // ============================================================================
 //  TAB: Danh bạ
 // ============================================================================
-var ContactsTab = ({ contacts, onOpen, onCall, onRemove, onAdd, peerStatus }) => (
+var ContactsTab = ({ friends, incoming, onOpen, onCall, onRemove, onAdd, onAccept, onReject, peerStatus }) => (
   <div className="flex-1 overflow-y-auto">
     <button onClick={onAdd}
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 border-b border-white/5 text-left text-sky-300">
@@ -255,12 +282,39 @@ var ContactsTab = ({ contacts, onOpen, onCall, onRemove, onAdd, peerStatus }) =>
       </span>
       <span className="font-semibold">Thêm bạn mới</span>
     </button>
-    {contacts.length === 0 ? (
+
+    {/* Lời mời kết bạn đến — duyệt hoặc từ chối */}
+    {incoming.length > 0 && (
+      <div className="border-b border-white/5">
+        <div className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-sky-300/80">
+          Lời mời kết bạn ({incoming.length})
+        </div>
+        {incoming.map(r => (
+          <div key={r.pairId} className="flex items-center gap-3 px-4 py-3">
+            <Avatar name={r.displayName} color={r.avatarColor} size={44} />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold truncate">{r.displayName}</div>
+              <div className="text-xs text-slate-400 truncate">muốn kết bạn với bạn</div>
+            </div>
+            <button onClick={() => onAccept(r)} title="Chấp nhận"
+              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-semibold flex items-center gap-1">
+              <Check className="w-4 h-4" /> Đồng ý
+            </button>
+            <button onClick={() => onReject(r)} title="Từ chối"
+              className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {friends.length === 0 ? (
       <div className="text-center text-slate-500 px-6 py-12">
         <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
-        <p className="text-sm">Danh bạ trống. Bấm <b className="text-sky-300">Thêm bạn mới</b> để bắt đầu.</p>
+        <p className="text-sm">Chưa có bạn bè. Bấm <b className="text-sky-300">Thêm bạn mới</b> để gửi lời mời.</p>
       </div>
-    ) : contacts.map(c => (
+    ) : friends.map(c => (
       <div key={c.uid} className="group flex items-center gap-3 px-4 py-3 hover:bg-white/5 border-b border-white/5">
         <Avatar name={c.displayName} color={c.avatarColor} size={48} />
         <button onClick={() => onOpen(c)} className="min-w-0 flex-1 text-left">
@@ -395,26 +449,31 @@ var ProfileTab = ({ profile, onSave, onLogout, myPeerId, peerStatus }) => {
 var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatus }) => {
   const [tab, setTab] = useState('messages');
   const [conversations, setConversations] = useState([]);
-  const [contacts, setContacts] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [incomingReqs, setIncomingReqs] = useState([]);
   const [openChatWith, setOpenChatWith] = useState(null);
   const [showAddContact, setShowAddContact] = useState(false);
 
   useEffect(() => {
     if (!fbConfigured()) return;
     const u1 = fbSubscribeConversations(profile.uid, setConversations);
-    const u2 = fbSubscribeContacts(profile.uid, setContacts);
+    const u2 = fbSubscribeFriendships(profile.uid, ({ friends, incoming }) => {
+      setFriends(friends); setIncomingReqs(incoming);
+    });
     return () => { u1 && u1(); u2 && u2(); };
   }, [profile.uid]);
 
   // Mở chat từ tab Tin nhắn (chỉ có otherUid/Name) → bổ sung username từ danh bạ nếu có
   const openChat = (other) => {
-    const known = contacts.find(c => c.uid === other.uid);
+    const known = friends.find(c => c.uid === other.uid);
     setOpenChatWith(known ? { ...known } : other);
   };
 
   const removeContact = async (c) => {
-    if (confirm(`Xoá ${c.displayName} khỏi danh bạ?`)) await fbRemoveContact(profile.uid, c.uid);
+    if (confirm(`Huỷ kết bạn với ${c.displayName}?`)) await fbDeleteFriendship(c.pairId);
   };
+  const acceptRequest = async (r) => { await fbAcceptFriendRequest(r.pairId); };
+  const rejectRequest = async (r) => { await fbDeleteFriendship(r.pairId); };
 
   // Đang mở 1 cuộc trò chuyện
   if (openChatWith) {
@@ -428,7 +487,7 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
 
   const TABS = [
     { key: 'messages', label: 'Tin nhắn', Icon: MessageSquare },
-    { key: 'contacts', label: 'Danh bạ', Icon: Users },
+    { key: 'contacts', label: 'Danh bạ', Icon: Users, badge: incomingReqs.length },
     { key: 'profile', label: 'Cá nhân', Icon: Settings },
   ];
   const titleMap = { messages: 'Tin nhắn', contacts: 'Danh bạ', profile: 'Cá nhân' };
@@ -455,19 +514,26 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
 
       {/* Nội dung */}
       {tab === 'messages' && <MessagesTab profile={profile} conversations={conversations} onOpen={openChat} />}
-      {tab === 'contacts' && <ContactsTab contacts={contacts} onOpen={openChat} onCall={onStartCall}
-        onRemove={removeContact} onAdd={() => setShowAddContact(true)} peerStatus={peerStatus} />}
+      {tab === 'contacts' && <ContactsTab friends={friends} incoming={incomingReqs}
+        onOpen={openChat} onCall={onStartCall} onRemove={removeContact}
+        onAdd={() => setShowAddContact(true)} onAccept={acceptRequest} onReject={rejectRequest}
+        peerStatus={peerStatus} />}
       {tab === 'profile' && <ProfileTab profile={profile} onSave={onSaveProfile} onLogout={onLogout}
         myPeerId={myPeerId} peerStatus={peerStatus} />}
 
       {/* Thanh tab dưới cùng */}
       <nav className="shrink-0 grid grid-cols-3 border-t border-blue-950/80 bg-slate-950/70 backdrop-blur">
-        {TABS.map(({ key, label, Icon }) => {
+        {TABS.map(({ key, label, Icon, badge }) => {
           const active = tab === key;
           return (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex flex-col items-center gap-0.5 py-2.5 transition ${active ? 'text-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>
+              className={`relative flex flex-col items-center gap-0.5 py-2.5 transition ${active ? 'text-sky-400' : 'text-slate-500 hover:text-slate-300'}`}>
               <Icon className="w-5 h-5" />
+              {badge > 0 && (
+                <span className="absolute top-1.5 right-1/2 translate-x-4 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
               <span className="text-[11px] font-medium">{label}</span>
             </button>
           );
