@@ -147,11 +147,14 @@ var usePeerConnection = (userName, localStream) => {
   const connectTo = useCallback((targetId) => {
     if (!peerRef.current) { console.error('PeerJS chưa sẵn sàng'); return false; }
     if (targetId === myPeerId) return false;
-    if (peersRef.current[targetId]) return true;
+    if (peersRef.current[targetId]) { console.log('⏭️ Đã có kết nối tới', targetId, '— bỏ qua gọi trùng'); return true; }
     console.log('📞 Calling:', targetId);
     const conn = peerRef.current.connect(targetId, { reliable: true });
-    setupDataConn(conn);
     const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
+    // Ghi nhận NGAY (trước khi stream/dataConn kịp mở) để chặn việc gọi trùng
+    // tới cùng một người — nguyên nhân làm 2 máy "lệch kênh", media không qua.
+    peersRef.current[targetId] = { ...peersRef.current[targetId], call, dataConn: conn };
+    setupDataConn(conn);
     watchIce(call, 'caller');
     call.on('stream', (rs) => { console.log('🎥 Nhận được hình từ', targetId); updatePeer(targetId, { stream: rs, call }); });
     call.on('close', () => handleCallClose(targetId));
