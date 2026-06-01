@@ -43,6 +43,7 @@ var usePeerConnection = (userName, localStream) => {
 
   const setupDataConn = (conn) => {
     conn.on('open', () => {
+      console.log('💬 KÊNH CHAT ĐÃ MỞ với', conn.peer, '— kết nối THÀNH CÔNG');
       updatePeer(conn.peer, { dataConn: conn });
       try { conn.send({ type: 'hello', name: userNameRef.current }); } catch(_){}
     });
@@ -51,7 +52,21 @@ var usePeerConnection = (userName, localStream) => {
       else if (data.type === 'asl') updatePeer(conn.peer, { asl: data.payload });
       dataHandlersRef.current.forEach(h => h(conn.peer, data));
     });
+    conn.on('error', (e) => console.warn('💬 Lỗi kênh chat', conn.peer, e?.type || e));
     conn.on('close', () => handleDataClose(conn.peer));
+  };
+
+  // In ra đường đi thật sự khi đã kết nối (host=trực tiếp, srflx=qua STUN,
+  // relay=qua TURN). Giúp biết mạng có chặn P2P không.
+  const logSelectedPair = (pc, label, peer) => {
+    pc.getStats().then((stats) => {
+      stats.forEach((r) => {
+        if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') {
+          const l = stats.get(r.localCandidateId), rm = stats.get(r.remoteCandidateId);
+          console.log(`🔗 [${label} ${peer}] Kết nối qua: local=${l?.candidateType} remote=${rm?.candidateType}`);
+        }
+      });
+    }).catch(() => {});
   };
 
   // Chẩn đoán: in trạng thái ICE/kết nối WebRTC ra console để biết media có
@@ -60,7 +75,13 @@ var usePeerConnection = (userName, localStream) => {
     const attach = () => {
       const pc = call.peerConnection;
       if (!pc) { setTimeout(attach, 300); return; }
-      const log = () => console.log(`[ICE ${label} ${call.peer}] ice=${pc.iceConnectionState} conn=${pc.connectionState}`);
+      const log = () => {
+        console.log(`[ICE ${label} ${call.peer}] ice=${pc.iceConnectionState} conn=${pc.connectionState}`);
+        if (pc.connectionState === 'connected') logSelectedPair(pc, label, call.peer);
+        if (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') {
+          console.warn(`❌ [${label} ${call.peer}] KẾT NỐI THẤT BẠI — nhiều khả năng router chặn P2P (AP Isolation) hoặc TURN không hoạt động. Thử dùng hotspot 4G để kiểm chứng.`);
+        }
+      };
       pc.addEventListener('iceconnectionstatechange', log);
       pc.addEventListener('connectionstatechange', log);
       log();

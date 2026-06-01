@@ -76,7 +76,10 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
   }, [media.stream]);
 
   useEffect(() => {
-    if (media.stream && stt.supported && !stt.isListening) {
+    // Chỉ TỰ bật nhận giọng nói trên máy tính. Trên điện thoại, dịch vụ giọng
+    // nói của Google hay báo lỗi và làm phiền → để người dùng tự bấm nút "Type".
+    const isDesktop = typeof window === 'undefined' ? true : window.innerWidth >= 768;
+    if (media.stream && stt.supported && !stt.isListening && isDesktop) {
       const t = setTimeout(() => stt.start(), 1000);
       return () => clearTimeout(t);
     }
