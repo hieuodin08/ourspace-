@@ -38,14 +38,20 @@ window.OURSPACE_FIREBASE_CONFIG = {
 //      match /users/{uid} {
 //        allow read: if request.auth != null;
 //        allow write: if request.auth != null && request.auth.uid == uid;
-//        match /contacts/{c} {
-//          allow read, write: if request.auth != null && request.auth.uid == uid;
-//        }
 //      }
 //      // Bảng tra cứu username -> uid
 //      match /usernames/{name} {
 //        allow read: if request.auth != null;
 //        allow create: if request.auth != null;
+//      }
+//      // Kết bạn: chỉ 2 người trong cặp mới đọc/sửa/xoá. Khi tạo lời mời,
+//      // người gửi phải là chính mình (requestedBy == uid đang đăng nhập).
+//      match /friendships/{pairId} {
+//        allow read, update, delete: if request.auth != null
+//          && request.auth.uid in resource.data.members;
+//        allow create: if request.auth != null
+//          && request.auth.uid in request.resource.data.members
+//          && request.resource.data.requestedBy == request.auth.uid;
 //      }
 //      // Hội thoại: chỉ thành viên mới đọc/ghi
 //      match /conversations/{cid} {

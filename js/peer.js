@@ -5,6 +5,7 @@ var usePeerConnection = (userName, localStream) => {
   const [error, setError] = useState(null);
   const [peers, setPeers] = useState({});
   const [incomingTick, setIncomingTick] = useState(0); // tăng mỗi khi có cuộc gọi đến
+  const [incomingCallPeer, setIncomingCallPeer] = useState(null); // peerId đang gọi đến, chờ Nghe/Từ chối
   const peerRef = useRef(null);
   const peersRef = useRef({});
   const streamRef = useRef(null);
@@ -98,10 +99,16 @@ var usePeerConnection = (userName, localStream) => {
     });
     peer.on('call', (call) => {
       console.log('📞 Incoming call:', call.peer);
-      // KHÔNG trả lời ngay — xếp vào hàng đợi để App bật camera trước rồi mới
-      // answer (tránh trả lời với stream rỗng làm đối phương không thấy hình).
+      // KHÔNG trả lời ngay — xếp vào hàng đợi và báo cho App hiện màn hình
+      // "Cuộc gọi đến" để người nhận chủ động Nghe hoặc Từ chối.
       pendingCallsRef.current.push(call);
+      setIncomingCallPeer(call.peer);
       setIncomingTick(t => t + 1);
+      // Người gọi huỷ trước khi mình kịp trả lời → gỡ khỏi hàng đợi.
+      call.on('close', () => {
+        pendingCallsRef.current = pendingCallsRef.current.filter(c => c !== call);
+        if (pendingCallsRef.current.length === 0) setIncomingCallPeer(null);
+      });
     });
     peer.on('connection', (conn) => {
       console.log('💬 Incoming data conn:', conn.peer);
@@ -136,15 +143,28 @@ var usePeerConnection = (userName, localStream) => {
     return true;
   }, [myPeerId]);
 
-  // Trả lời mọi cuộc gọi đang chờ bằng stream hiện có (gọi khi camera đã sẵn sàng).
+  // Trả lời mọi cuộc gọi đang chờ bằng stream hiện có (gọi khi đã bấm Nghe + có camera).
   const answerPending = useCallback((stream) => {
     const calls = pendingCallsRef.current;
     pendingCallsRef.current = [];
+    setIncomingCallPeer(null);
     calls.forEach((call) => {
       try { call.answer(stream || new MediaStream()); } catch(_){}
       call.on('stream', (rs) => updatePeer(call.peer, { stream: rs, call }));
       call.on('close', () => handleCallClose(call.peer));
     });
+  }, []);
+
+  // Từ chối cuộc gọi đến: báo cho người gọi (nếu còn kênh dữ liệu) rồi đóng,
+  // không bật camera, ở nguyên màn hình hiện tại.
+  const rejectIncoming = useCallback(() => {
+    pendingCallsRef.current.forEach((call) => {
+      const p = peersRef.current[call.peer];
+      try { p?.dataConn?.send({ type: 'call-ended', reason: 'rejected' }); } catch(_){}
+      try { call.close(); } catch(_){}
+    });
+    pendingCallsRef.current = [];
+    setIncomingCallPeer(null);
   }, []);
 
   // Cúp toàn bộ cuộc gọi/kênh dữ liệu hiện tại nhưng GIỮ peer sống để vẫn nhận
@@ -169,5 +189,5 @@ var usePeerConnection = (userName, localStream) => {
     return () => { dataHandlersRef.current = dataHandlersRef.current.filter(h => h !== handler); };
   }, []);
 
-  return { status, myPeerId, error, peers, incomingTick, connectTo, broadcast, onData, hangUpAll, answerPending };
+  return { status, myPeerId, error, peers, incomingTick, incomingCallPeer, connectTo, broadcast, onData, hangUpAll, answerPending, rejectIncoming };
 };

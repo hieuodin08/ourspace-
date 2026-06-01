@@ -157,13 +157,14 @@ var Lobby = ({ onJoin, onTerms } = {}) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="email">Email (tùy chọn)</label>
+                  <label htmlFor="email">Email</label>
                   <input
                     type="email" id="email" name="email"
                     placeholder="email@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="email"
+                    required
                   />
                 </div>
               </>
