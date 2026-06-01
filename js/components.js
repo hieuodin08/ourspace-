@@ -499,7 +499,7 @@ var ASLPanel = ({ asl, onSpeak, onSendAsMessage }) => {
 
 // ====== UI: Local PIP (video nhỏ góc trên-phải) ======
 var LocalPip = ({ videoRef, signEnabled, aslLetter, aslConfidence, allLandmarks, showLandmarks, userName, audioEnabled, videoEnabled }) => (
-  <div className="absolute top-4 right-4 w-48 sm:w-56 md:w-64 aspect-video rounded-2xl border-2 border-blue-500 ring-4 ring-blue-500/20 shadow-2xl shadow-blue-950/60 overflow-hidden bg-slate-950 z-20">
+  <div className="absolute top-3 right-3 md:top-4 md:right-4 w-28 sm:w-44 md:w-64 aspect-video rounded-2xl border-2 border-blue-500 ring-4 ring-blue-500/20 shadow-2xl shadow-blue-950/60 overflow-hidden bg-slate-950 z-20">
     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
     {showLandmarks && signEnabled && (
       <HandSkeleton allLandmarks={allLandmarks} mirror={true} />

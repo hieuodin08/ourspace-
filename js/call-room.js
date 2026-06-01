@@ -22,7 +22,10 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
   const visualAlert = useVisualAlerts();
   const localVideoRef = useRef(null);
   const [activePanel, setActivePanel] = useState('chat');
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Máy tính: mở sẵn khung chat/ký hiệu bên phải. Điện thoại: đóng để xem
+  // video toàn màn hình trước (panel là lớp phủ, mở khi cần).
+  const [panelOpen, setPanelOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 768);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [aslEnabled, setAslEnabled] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -194,7 +197,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
           </div>
 
           {peerConn.myPeerId && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
               <span className="text-xs text-emerald-400">🔗 ID:</span>
               <span className="font-mono font-bold text-xs text-emerald-300 truncate max-w-[160px]">{peerConn.myPeerId}</span>
               <button onClick={copyMyId} className="text-emerald-400 hover:text-emerald-200">
@@ -211,7 +214,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
 
           <div className="ml-auto flex items-center gap-2 text-sm flex-wrap">
             <button onClick={() => setShowJoinDialog(true)} disabled={peerConn.status !== 'connected'}
-              className="os-call-btn relative text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold disabled:opacity-50">
+              className="os-call-btn relative text-white px-4 py-2 rounded-xl hidden md:flex items-center gap-2 text-sm font-semibold disabled:opacity-50">
               <span className="os-call-ring relative z-10"><Phone className="w-4 h-4" /></span>
               <span className="relative z-10">Gọi người khác</span>
             </button>
@@ -223,7 +226,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
         </header>
 
         {/* Khu chính */}
-        <div className="grid grid-cols-1 gap-3 p-3 transition-[grid-template-columns] duration-300 ease-out"
+        <div className={`os-call-grid grid grid-cols-1 gap-3 p-3 transition-[grid-template-columns] duration-300 ease-out ${panelOpen ? '' : 'panel-closed'}`}
              style={{
                height: 'calc(100vh - 64px)',
                gridTemplateColumns: panelOpen ? 'minmax(0, 1fr) 380px' : 'minmax(0, 1fr) 0px',
@@ -368,7 +371,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
           {/* Panel phải (có thể ẩn) */}
           <div
             aria-hidden={!panelOpen}
-            className={`flex flex-col gap-2 min-h-0 overflow-hidden transition-all duration-300 ease-out ${panelOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}
+            className={`os-call-panel flex flex-col gap-2 min-h-0 overflow-hidden transition-all duration-300 ease-out ${panelOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none closed'}`}
           >
             {/* Mode switch */}
             <div className={`os-mode-bar ${panelMode} flex items-center gap-3 p-2 rounded-2xl border backdrop-blur`}>

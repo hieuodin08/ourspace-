@@ -331,6 +331,37 @@ body:has(.ourspace-login) { background: #020817; }
 }
 
 /* ============================================================
+   PHÒNG GỌI TRÊN ĐIỆN THOẠI (≤767px)
+   Dùng !important để ghi đè inline-style (vốn dành cho máy tính).
+   Máy tính (≥768px) KHÔNG bị ảnh hưởng bởi khối này.
+   ============================================================ */
+@media (max-width: 767px) {
+  /* Bố cục 1 cột: video chiếm phần lớn màn hình, không bị panel bóp méo */
+  .os-call-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: calc(100vh - 60px) !important;
+    min-height: calc(100dvh - 60px) !important;
+  }
+  .os-call-grid > div:first-child {
+    flex: 1 1 auto !important;
+    min-height: 58vh !important;
+  }
+  /* Khung chat/ký hiệu thành lớp phủ toàn màn hình khi mở */
+  .os-call-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 45 !important;
+    background: #051030 !important;
+    padding: 12px !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .os-call-panel.closed { display: none !important; }
+}
+
+/* ============================================================
    CALL ROOM — OS styles (xanh navy)
    ============================================================ */
 
