@@ -42,11 +42,14 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
   useEffect(() => { if (!media.stream && !media.isStarting && !media.error) media.startMedia(); }, []);
 
   // Cuộc gọi ĐI: chỉ gọi tới callTarget sau khi đã có camera để đối phương thấy hình.
+  // QUAN TRỌNG: truyền media.stream TRỰC TIẾP — đừng để connectTo tự đọc qua
+  // streamRef vì sẽ race với effect đồng bộ streamRef bên trong usePeerConnection,
+  // dẫn tới gọi với MediaStream rỗng (cả 2 bên đều không thấy hình/tiếng).
   const dialedRef = useRef(false);
   useEffect(() => {
     if (callTarget && !dialedRef.current && peerConn.status === 'connected' && media.stream) {
       dialedRef.current = true;
-      peerConn.connectTo(callTarget);
+      peerConn.connectTo(callTarget, media.stream);
     }
   }, [callTarget, peerConn.status, media.stream]);
 
@@ -137,7 +140,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
 
   const handleConnect = () => {
     if (targetPeer.trim()) {
-      peerConn.connectTo(targetPeer.trim());
+      peerConn.connectTo(targetPeer.trim(), media.stream);
       setTargetPeer('');
       setShowJoinDialog(false);
     }

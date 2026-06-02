@@ -165,13 +165,20 @@ var usePeerConnection = (userName, localStream) => {
     };
   }, []);
 
-  const connectTo = useCallback((targetId) => {
+  const connectTo = useCallback((targetId, stream) => {
     if (!peerRef.current) { console.error('PeerJS chưa sẵn sàng'); return false; }
     if (targetId === myPeerId) return false;
     if (peersRef.current[targetId]) { console.log('⏭️ Đã có kết nối tới', targetId, '— bỏ qua gọi trùng'); return true; }
-    console.log('📞 Calling:', targetId);
+    // Ưu tiên stream được TRUYỀN VÀO (giá trị mới nhất từ caller). Nếu chỉ đọc
+    // streamRef.current sẽ dính race: dial effect ở CallRoom (con) fire TRƯỚC
+    // effect đồng bộ streamRef ở đây (cha) → call.peer được tạo với MediaStream
+    // RỖNG (0 tracks). Offer không có m-line → answer cũng không add được track
+    // → CẢ 2 CHIỀU đều không truyền được hình/tiếng.
+    const streamToSend = stream || streamRef.current || new MediaStream();
+    const trackCount = streamToSend.getTracks ? streamToSend.getTracks().length : 0;
+    console.log('📞 Calling:', targetId, `— tracks: ${trackCount}`);
     const conn = peerRef.current.connect(targetId, { reliable: true });
-    const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
+    const call = peerRef.current.call(targetId, streamToSend);
     // Ghi nhận NGAY (trước khi stream/dataConn kịp mở) để chặn việc gọi trùng
     // tới cùng một người — nguyên nhân làm 2 máy "lệch kênh", media không qua.
     peersRef.current[targetId] = { ...peersRef.current[targetId], call, dataConn: conn };
