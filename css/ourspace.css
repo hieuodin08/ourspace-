@@ -12,6 +12,14 @@
 }
 body:has(.ourspace-login) { background: #020817; }
 
+/* FIX lệch-trái trên laptop (Edge/Chrome/Windows):
+   Thanh cuộn dọc chiếm ~15px ở MÉP PHẢI → vùng nội dung hẹp lại bên phải,
+   nên mọi thứ "căn giữa" lại trông như lệch sang trái. Chừa gutter thanh cuộn
+   ở CẢ HAI mép để vùng nội dung luôn đối xứng → căn giữa là căn giữa thật,
+   không cần đẩy bù sang phải. (Mobile dùng thanh cuộn overlay nên không bị
+   ảnh hưởng; chỉ áp dụng cho trang có .ourspace-login để không động tới app.) */
+html:has(.ourspace-login) { scrollbar-gutter: stable both-edges; }
+
 .ourspace-login .background {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background:
