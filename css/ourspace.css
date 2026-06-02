@@ -2,13 +2,13 @@
   position: relative;
   min-height: 100vh;
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;   /* FIX: khoá cuộn ngang */
+  overflow-y: auto;     /* FIX: cho cuộn dọc khi màn thấp, tránh che nút */
 }
 
 .ourspace-login * { margin: 0; padding: 0; box-sizing: border-box; }
 .ourspace-login {
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  overflow: hidden;
 }
 body:has(.ourspace-login) { background: #020817; }
 
@@ -104,17 +104,19 @@ body:has(.ourspace-login) { background: #020817; }
 
 .ourspace-login .container {
   display: flex; flex-direction: column;
-  justify-content: center; align-items: flex-start;
-  min-height: 100vh; padding: 20px;
+  justify-content: center;
+  align-items: center;                /* FIX: căn giữa (cũ: flex-start) */
+  min-height: 100vh;
+  min-height: 100dvh;                 /* FIX: tránh thanh địa chỉ che trên mobile */
+  padding: clamp(20px, 5vw, 48px);    /* FIX: đệm đều (cũ: padding-left:30%) */
+  gap: clamp(28px, 5vh, 44px);        /* FIX: khoảng cách tiêu đề ↔ form */
   position: relative; z-index: 10;
   width: 100%;
   text-align: center;
-  padding-left: 30%;
-  padding-right: 0;
 }
 
 .ourspace-login .header {
-  text-align: center; margin-bottom: 40px; opacity: 0;
+  text-align: center; margin-bottom: 0; opacity: 0;   /* FIX: dùng gap thay margin cố định */
   animation: slideInHeader 0.8s ease-out 0.2s forwards;
   width: 100%; max-width: 600px;
   display: flex; flex-direction: column; align-items: center;
@@ -141,9 +143,10 @@ body:has(.ourspace-login) { background: #020817; }
 
 .ourspace-login .header h1 {
   font-family: 'Arlen Script', 'Allura', 'Sacramento', 'Brush Script MT', cursive;
-  font-size: 6rem; font-weight: 400; font-style: normal;
+  font-size: clamp(3.2rem, 13vw, 6rem);   /* FIX: tự co giãn, hết tràn trên màn nhỏ */
+  font-weight: 400; font-style: normal;
   color: #ffffff; letter-spacing: 0.04em; line-height: 1.05;
-  margin: 0 auto 18px;
+  margin: 0 auto 12px;
   text-shadow:
     0 0 8px rgba(255, 255, 255, 1),
     0 0 18px rgba(255, 255, 255, 0.95),
@@ -198,7 +201,7 @@ body:has(.ourspace-login) { background: #020817; }
   opacity: 0;
   animation: slideInForm 0.8s ease-out 0.4s forwards;
   width: 100%; max-width: 400px;
-  margin: 0 0 0 100px;
+  margin: 0 auto;                 /* FIX: căn giữa (cũ: margin: 0 0 0 100px) */
   display: flex; flex-direction: column; align-items: center;
 }
 @keyframes slideInForm {
@@ -322,31 +325,11 @@ body:has(.ourspace-login) { background: #020817; }
   margin: 0 4px; display: inline;
 }
 
-/* ----- Trang đăng nhập trên điện thoại/tablet (≤767px) -----
-   Bỏ phần đẩy form sang phải (vốn dành cho máy tính), canh giữa lại.
-   Máy tính (≥768px) giữ nguyên bố cục lệch phải như cũ. */
-@media (max-width: 767px) {
-  .ourspace-login .container {
-    align-items: center !important;
-    justify-content: center !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-  }
-  .ourspace-login .header { margin-bottom: 28px; max-width: 100%; }
-  .ourspace-login .header h1 {
-    font-size: 3rem !important;
-    white-space: normal !important;
-    padding: 0 !important;
-  }
-  .ourspace-login .login-form-wrapper {
-    margin: 0 auto !important;
-    max-width: 420px;
-  }
-}
-
+/* ----- Trang đăng nhập (đã sửa) -----
+   Bố cục đã căn giữa sẵn ở .container + tiêu đề dùng clamp(),
+   nên KHÔNG còn cần ghi đè vị trí bằng !important. Chỉ tinh chỉnh nhỏ cho màn hẹp. */
 @media (max-width: 480px) {
-  .ourspace-login .header h1 { font-size: 2rem; }
-  .ourspace-login .login-form { padding: 30px 20px; border-radius: 12px; }
+  .ourspace-login .login-form { padding: 28px 20px; border-radius: 12px; }
   .ourspace-login .form-group { margin-bottom: 20px; }
   .ourspace-login .footer-links a { display: block; margin: 8px 0; }
   .ourspace-login .footer-links-divider { display: none; }
