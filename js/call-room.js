@@ -46,7 +46,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
   useEffect(() => {
     if (callTarget && !dialedRef.current && peerConn.status === 'connected' && media.stream) {
       dialedRef.current = true;
-      peerConn.connectTo(callTarget);
+      peerConn.connectTo(callTarget, media.stream);
     }
   }, [callTarget, peerConn.status, media.stream]);
 
@@ -137,7 +137,7 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
 
   const handleConnect = () => {
     if (targetPeer.trim()) {
-      peerConn.connectTo(targetPeer.trim());
+      peerConn.connectTo(targetPeer.trim(), media.stream);
       setTargetPeer('');
       setShowJoinDialog(false);
     }
