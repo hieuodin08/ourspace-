@@ -165,13 +165,22 @@ var usePeerConnection = (userName, localStream) => {
     };
   }, []);
 
-  const connectTo = useCallback((targetId) => {
+  // QUAN TRỌNG: hãy truyền THẲNG MediaStream đang dùng vào tham số `stream`.
+  // KHÔNG dựa vào streamRef vì khi camera vừa bật, effect đồng bộ streamRef nằm ở
+  // component CHA (usePeerConnection) chạy SAU effect quay số ở component CON
+  // (CallRoom) — React flush effect con trước, cha sau. Tại commit kích hoạt,
+  // streamRef.current còn rỗng → gọi đi bằng stream TRỐNG (0 track) → offer không
+  // có m-line audio/video ⇒ hình & tiếng KHÔNG qua được (chỉ còn chat chạy trên
+  // DataConnection riêng). Đây chính là lỗi "gọi kết nối được mà không thấy
+  // hình/nghe tiếng".
+  const connectTo = useCallback((targetId, stream) => {
     if (!peerRef.current) { console.error('PeerJS chưa sẵn sàng'); return false; }
     if (targetId === myPeerId) return false;
     if (peersRef.current[targetId]) { console.log('⏭️ Đã có kết nối tới', targetId, '— bỏ qua gọi trùng'); return true; }
-    console.log('📞 Calling:', targetId);
+    const outStream = stream || streamRef.current || new MediaStream();
+    console.log('📞 Calling:', targetId, '— gửi', outStream.getTracks().length, 'track media');
     const conn = peerRef.current.connect(targetId, { reliable: true });
-    const call = peerRef.current.call(targetId, streamRef.current || new MediaStream());
+    const call = peerRef.current.call(targetId, outStream);
     // Ghi nhận NGAY (trước khi stream/dataConn kịp mở) để chặn việc gọi trùng
     // tới cùng một người — nguyên nhân làm 2 máy "lệch kênh", media không qua.
     peersRef.current[targetId] = { ...peersRef.current[targetId], call, dataConn: conn };
