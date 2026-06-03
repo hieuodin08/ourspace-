@@ -453,6 +453,8 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
   const [incomingReqs, setIncomingReqs] = useState([]);
   const [openChatWith, setOpenChatWith] = useState(null);
   const [showAddContact, setShowAddContact] = useState(false);
+  const [contactsView, setContactsView] = useState('list'); // 'list' | 'galaxy'
+  const GalaxyView = window.GalaxyView;
 
   useEffect(() => {
     if (!fbConfigured()) return;
@@ -506,18 +508,38 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
             : <><Loader className="w-3 h-3 animate-spin text-amber-400" /><span className="text-amber-400">Đang kết nối</span></>}
         </div>
         {tab === 'contacts' && (
-          <button onClick={() => setShowAddContact(true)} className="p-2 rounded-lg text-sky-300 hover:bg-white/10">
-            <UserPlus className="w-5 h-5" />
-          </button>
+          <>
+            {GalaxyView && (
+              <button onClick={() => setContactsView(v => v === 'galaxy' ? 'list' : 'galaxy')}
+                title="Xem bạn bè dạng vũ trụ"
+                className={'gx-toggle-btn' + (contactsView === 'galaxy' ? ' on' : '')}>
+                <Sparkles className="w-3.5 h-3.5" /> Vũ trụ
+              </button>
+            )}
+            <button onClick={() => setShowAddContact(true)} className="p-2 rounded-lg text-sky-300 hover:bg-white/10">
+              <UserPlus className="w-5 h-5" />
+            </button>
+          </>
         )}
       </header>
 
       {/* Nội dung */}
       {tab === 'messages' && <MessagesTab profile={profile} conversations={conversations} onOpen={openChat} />}
-      {tab === 'contacts' && <ContactsTab friends={friends} incoming={incomingReqs}
-        onOpen={openChat} onCall={onStartCall} onRemove={removeContact}
-        onAdd={() => setShowAddContact(true)} onAccept={acceptRequest} onReject={rejectRequest}
-        peerStatus={peerStatus} />}
+      {tab === 'contacts' && (
+        contactsView === 'galaxy' && GalaxyView ? (
+          <div className="relative flex-1 min-h-0">
+            <GalaxyView profile={profile} friends={friends} incoming={incomingReqs}
+              onOpenChat={openChat} onStartCall={onStartCall}
+              onAccept={acceptRequest} onDecline={rejectRequest}
+              onAddFriend={() => setShowAddContact(true)} />
+          </div>
+        ) : (
+          <ContactsTab friends={friends} incoming={incomingReqs}
+            onOpen={openChat} onCall={onStartCall} onRemove={removeContact}
+            onAdd={() => setShowAddContact(true)} onAccept={acceptRequest} onReject={rejectRequest}
+            peerStatus={peerStatus} />
+        )
+      )}
       {tab === 'profile' && <ProfileTab profile={profile} onSave={onSaveProfile} onLogout={onLogout}
         myPeerId={myPeerId} peerStatus={peerStatus} />}
 
