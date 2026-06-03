@@ -11,13 +11,15 @@
   const KAvatar = window.ContactsParts.Avatar;
 
   /* ---------- Bottom dock ---------- */
-  function Dock({ onOpen, current, incomingCount }) {
-    const items = [
+  function Dock({ onOpen, current, incomingCount, showMessages }) {
+    const items = [];
+    if (showMessages) items.push({ id: 'messages', icon: 'message', label: 'Tin nhắn' });
+    items.push(
       { id: 'search', icon: 'search', label: 'Tìm kiếm' },
       { id: 'list', icon: 'list', label: 'Danh sách A–Z' },
       { id: 'add', icon: 'userPlus', label: 'Thêm bạn' },
       { id: 'requests', icon: 'bell', label: 'Lời mời', badge: incomingCount },
-    ];
+    );
     return (
       <div className="dock">
         <div className="dock-inner">
@@ -134,5 +136,27 @@
     );
   }
 
-  window.DockParts = { Dock, ListOverlay, RequestsOverlay };
+  /* ---------- Messages overlay (danh sách hội thoại) ---------- */
+  function MessagesOverlay({ conversations, myUid, square, onClose, onPick }) {
+    const list = conversations || [];
+    return (
+      <Overlay title="Tin nhắn" subtitle={`${list.length} cuộc trò chuyện`} onClose={onClose}>
+        <div className="ov-scroll">
+          {list.length === 0 && <div className="ov-empty">Chưa có cuộc trò chuyện nào.</div>}
+          {list.map(c => (
+            <button key={c.id} className="ov-row" onClick={() => onPick(c)}>
+              <KAvatar name={c.otherName} size={42} square={square} />
+              <span className="ov-row-main">
+                <span className="ov-name">{c.otherName}</span>
+                <span className="ov-subtxt">{c.lastSender === myUid ? 'Bạn: ' : ''}{c.lastMessage || '…'}</span>
+              </span>
+              <span className="ov-go"><KIcon name="chevron" size={18} /></span>
+            </button>
+          ))}
+        </div>
+      </Overlay>
+    );
+  }
+
+  window.DockParts = { Dock, ListOverlay, RequestsOverlay, MessagesOverlay };
 })();

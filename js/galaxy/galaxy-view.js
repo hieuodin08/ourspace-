@@ -20,7 +20,7 @@
   const KP = window.DockParts;
   const CF = window.Comets;
 
-  function GalaxyView({ profile, friends, incoming, onOpenChat, onStartCall, onAccept, onDecline, onAddFriend }) {
+  function GalaxyView({ profile, friends, incoming, conversations, onOpenChat, onStartCall, onAccept, onDecline, onAddFriend, onEditProfile, showMessages }) {
     const square = false;
     const [sel, setSel] = useState(null);       // { f, rect:{cx,cy} }
     const [overlay, setOverlay] = useState(null);
@@ -88,7 +88,8 @@
           <GP.Legend />
           <GP.Galaxy friends={nodes} scale={scale} square={square}
             meName={profile && profile.displayName}
-            selectedName={sel && sel.f.name} paused={paused} onSelect={selectStar} />
+            selectedName={sel && sel.f.name} paused={paused} onSelect={selectStar}
+            onCenterClick={onEditProfile} />
           {!hintGone && nodes.length > 0 && (
             <div className="gx-hint">Chạm vào một vì sao để mở hồ sơ</div>
           )}
@@ -108,8 +109,14 @@
             onClose={() => setSel(null)} />
         )}
 
-        <KP.Dock current={overlay} incomingCount={incomingList.length} onOpen={openDock} />
+        <KP.Dock current={overlay} incomingCount={incomingList.length}
+          showMessages={showMessages} onOpen={openDock} />
 
+        {overlay === 'messages' && (
+          <KP.MessagesOverlay conversations={conversations || []} myUid={profile && profile.uid} square={square}
+            onClose={() => setOverlay(null)}
+            onPick={(c) => { setOverlay(null); if (onOpenChat) onOpenChat({ uid: c.otherUid, displayName: c.otherName, avatarColor: c.otherColor, username: '' }); }} />
+        )}
         {(overlay === 'search' || overlay === 'list') && (
           <KP.ListOverlay mode={overlay} friends={nodes} square={square}
             onClose={() => setOverlay(null)} onPick={pickFromList} />

@@ -139,6 +139,22 @@ var useVisualAlerts = () => {
   return { flash, alert };
 };
 
+// ====== HOOK: phát hiện điện thoại (matchMedia — tự cập nhật khi xoay/đổi cỡ) ======
+var useIsMobile = (breakpoint = 768) => {
+  const query = `(max-width: ${breakpoint - 1}px)`;
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const onChange = (e) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return isMobile;
+};
+
 // ====== HOOK: Throttled callback ======
 var useThrottledCallback = (fn, intervalMs) => {
   const fnRef = useRef(fn);

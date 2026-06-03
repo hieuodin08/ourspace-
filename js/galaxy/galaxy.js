@@ -92,7 +92,7 @@
   }
 
   /* ---------- The galaxy ---------- */
-  function Galaxy({ friends, scale, square, selectedName, paused, meName, onSelect }) {
+  function Galaxy({ friends, scale, square, selectedName, paused, meName, onSelect, onCenterClick }) {
     const tiers = useMemo(() => {
       const by = { 1: [], 2: [], 3: [] };
       (friends || []).forEach(f => { (by[f.tier] || by[3]).push(f); });
@@ -133,11 +133,19 @@
           );
         })}
 
-        <div className="gx-me">
-          <span className="gx-me-aura" />
-          <GAvatar name={meName || 'Bạn'} size={92} square={square} />
-          <span className="gx-me-label">Bạn</span>
-        </div>
+        {onCenterClick ? (
+          <button className="gx-me gx-me-btn" onClick={onCenterClick} title="Chỉnh sửa hồ sơ của bạn">
+            <span className="gx-me-aura" />
+            <GAvatar name={meName || 'Bạn'} size={92} square={square} />
+            <span className="gx-me-label">Bạn</span>
+          </button>
+        ) : (
+          <div className="gx-me">
+            <span className="gx-me-aura" />
+            <GAvatar name={meName || 'Bạn'} size={92} square={square} />
+            <span className="gx-me-label">Bạn</span>
+          </div>
+        )}
       </div>
     );
   }
