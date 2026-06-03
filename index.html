@@ -27,6 +27,12 @@
   <!-- CSS Lobby -->
   <link rel="stylesheet" href="css/ourspace.css" />
 
+  <!-- Danh bạ "Vũ trụ" (Galaxy) — fonts Outfit + Allura + CSS riêng -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Allura&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/galaxy.css" />
+
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   </style>
@@ -52,6 +58,16 @@
   <script type="text/babel" data-presets="react" src="js/components.js"></script>
   <script type="text/babel" data-presets="react" src="js/home.js"></script>
   <script type="text/babel" data-presets="react" src="js/call-room.js"></script>
+
+  <!-- Danh bạ "Vũ trụ" (Galaxy) — nạp theo thứ tự phụ thuộc, TRƯỚC app.js -->
+  <script type="text/babel" data-presets="react" src="js/galaxy/data.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/gx-icons.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/parts.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/galaxy.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/comets.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/dock.js"></script>
+  <script type="text/babel" data-presets="react" src="js/galaxy/galaxy-view.js"></script>
+
   <script type="text/babel" data-presets="react" src="js/app.js"></script>
 </body>
 </html>
