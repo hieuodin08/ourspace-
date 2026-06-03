@@ -129,6 +129,11 @@
 .gx-me .av-img { box-shadow: 0 0 0 3px rgba(255,255,255,.22), 0 0 40px var(--glow), 0 10px 40px rgba(0,0,0,.6); }
 .gx-me-label { font-size: 13px; font-weight: 600; color: #fff;
   background: var(--grad); padding: 4px 16px; border-radius: 999px; box-shadow: 0 4px 14px var(--glow); }
+/* sao trung tâm bấm được (mở sửa hồ sơ) */
+.gx-me-btn { transition: transform .2s; }
+.gx-me-btn:hover { transform: translate(-50%, -50%) scale(1.06); }
+.gx-me-btn:hover .gx-me-label { filter: brightness(1.1); }
+.gx-me-btn:hover .av-img { box-shadow: 0 0 0 3px var(--accent), 0 0 46px var(--glow), 0 10px 40px rgba(0,0,0,.6); }
 
 /* avatar (dùng chung) */
 .av { position: relative; display: inline-flex; }

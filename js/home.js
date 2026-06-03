@@ -444,6 +444,62 @@ var ProfileTab = ({ profile, onSave, onLogout, myPeerId, peerStatus }) => {
 };
 
 // ============================================================================
+//  MODAL: Sửa hồ sơ (mở khi chạm sao trung tâm ở giao diện Vũ trụ trên máy tính)
+//  Hiện chỉ sửa tên hiển thị + giới thiệu (theo yêu cầu: tạm bỏ đổi avatar).
+// ============================================================================
+var ProfileEditModal = ({ profile, onSave, onLogout, onClose, peerStatus }) => {
+  const [displayName, setDisplayName] = useState(profile.displayName || '');
+  const [about, setAbout] = useState(profile.about || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const name = displayName.trim();
+    if (!name) return;
+    setSaving(true);
+    try { await onSave({ displayName: name, about: about.trim() }); onClose(); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="os-dialog-backdrop fixed inset-0 bg-black/70 backdrop-blur z-[55] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="os-dialog-card bg-slate-900 border border-blue-900/60 rounded-2xl p-5 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="w-5 h-5 text-sky-400" />
+          <h3 className="text-lg font-bold flex-1">Hồ sơ của bạn</h3>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <Avatar name={profile.displayName} color={profile.avatarColor} size={84} online={peerStatus === 'connected'} />
+          <div className="text-xs text-slate-400">@{profile.username}</div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-slate-400 uppercase tracking-wider">Tên hiển thị</label>
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 uppercase tracking-wider">Giới thiệu</label>
+            <textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={2}
+              className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+          </div>
+          <button onClick={save} disabled={saving || !displayName.trim()}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+            {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Lưu
+          </button>
+          <button onClick={onLogout}
+            className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 text-red-300 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+            <LogOut className="w-4 h-4" /> Đăng xuất
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 //  HOME (shell + điều hướng tab + cửa sổ chat)
 // ============================================================================
 var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatus }) => {
@@ -453,7 +509,8 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
   const [incomingReqs, setIncomingReqs] = useState([]);
   const [openChatWith, setOpenChatWith] = useState(null);
   const [showAddContact, setShowAddContact] = useState(false);
-  const [contactsView, setContactsView] = useState('list'); // 'list' | 'galaxy'
+  const [editProfile, setEditProfile] = useState(false);
+  const isMobile = useIsMobile();
   const GalaxyView = window.GalaxyView;
 
   useEffect(() => {
@@ -487,6 +544,35 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
     );
   }
 
+  // 💻 MÁY TÍNH: cả màn Thông tin là "Vũ trụ" — thao tác qua dock, chạm sao
+  // trung tâm để sửa hồ sơ. 📱 Điện thoại: rơi xuống giao diện tab bên dưới.
+  if (!isMobile && GalaxyView) {
+    return (
+      <div className="h-full relative">
+        <GalaxyView
+          profile={profile}
+          friends={friends}
+          incoming={incomingReqs}
+          conversations={conversations}
+          onOpenChat={openChat}
+          onStartCall={onStartCall}
+          onAccept={acceptRequest}
+          onDecline={rejectRequest}
+          onAddFriend={() => setShowAddContact(true)}
+          onEditProfile={() => setEditProfile(true)}
+          showMessages
+        />
+        {showAddContact && (
+          <AddContactModal profile={profile} onClose={() => setShowAddContact(false)} onAdded={() => {}} />
+        )}
+        {editProfile && (
+          <ProfileEditModal profile={profile} onSave={onSaveProfile} onLogout={onLogout}
+            peerStatus={peerStatus} onClose={() => setEditProfile(false)} />
+        )}
+      </div>
+    );
+  }
+
   const TABS = [
     { key: 'messages', label: 'Tin nhắn', Icon: MessageSquare },
     { key: 'contacts', label: 'Danh bạ', Icon: Users, badge: incomingReqs.length },
@@ -508,38 +594,18 @@ var Home = ({ profile, onSaveProfile, onLogout, onStartCall, myPeerId, peerStatu
             : <><Loader className="w-3 h-3 animate-spin text-amber-400" /><span className="text-amber-400">Đang kết nối</span></>}
         </div>
         {tab === 'contacts' && (
-          <>
-            {GalaxyView && (
-              <button onClick={() => setContactsView(v => v === 'galaxy' ? 'list' : 'galaxy')}
-                title="Xem bạn bè dạng vũ trụ"
-                className={'gx-toggle-btn' + (contactsView === 'galaxy' ? ' on' : '')}>
-                <Sparkles className="w-3.5 h-3.5" /> Vũ trụ
-              </button>
-            )}
-            <button onClick={() => setShowAddContact(true)} className="p-2 rounded-lg text-sky-300 hover:bg-white/10">
-              <UserPlus className="w-5 h-5" />
-            </button>
-          </>
+          <button onClick={() => setShowAddContact(true)} className="p-2 rounded-lg text-sky-300 hover:bg-white/10">
+            <UserPlus className="w-5 h-5" />
+          </button>
         )}
       </header>
 
       {/* Nội dung */}
       {tab === 'messages' && <MessagesTab profile={profile} conversations={conversations} onOpen={openChat} />}
-      {tab === 'contacts' && (
-        contactsView === 'galaxy' && GalaxyView ? (
-          <div className="relative flex-1 min-h-0">
-            <GalaxyView profile={profile} friends={friends} incoming={incomingReqs}
-              onOpenChat={openChat} onStartCall={onStartCall}
-              onAccept={acceptRequest} onDecline={rejectRequest}
-              onAddFriend={() => setShowAddContact(true)} />
-          </div>
-        ) : (
-          <ContactsTab friends={friends} incoming={incomingReqs}
-            onOpen={openChat} onCall={onStartCall} onRemove={removeContact}
-            onAdd={() => setShowAddContact(true)} onAccept={acceptRequest} onReject={rejectRequest}
-            peerStatus={peerStatus} />
-        )
-      )}
+      {tab === 'contacts' && <ContactsTab friends={friends} incoming={incomingReqs}
+        onOpen={openChat} onCall={onStartCall} onRemove={removeContact}
+        onAdd={() => setShowAddContact(true)} onAccept={acceptRequest} onReject={rejectRequest}
+        peerStatus={peerStatus} />}
       {tab === 'profile' && <ProfileTab profile={profile} onSave={onSaveProfile} onLogout={onLogout}
         myPeerId={myPeerId} peerStatus={peerStatus} />}
 
