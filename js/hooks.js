@@ -53,7 +53,7 @@ var useMedia = () => {
 };
 
 // ====== HOOK: STT ======
-var useSpeechToText = (roomId, userId, userName) => {
+var useSpeechToText = (roomId, userId, userName, onResult) => {
   const [interim, setInterim] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState('vi-VN');
@@ -62,6 +62,10 @@ var useSpeechToText = (roomId, userId, userName) => {
   const listeningRef = useRef(false);
   const fatalRef = useRef(false); // gặp lỗi không phục hồi → ngừng tự khởi động lại
   const db = useDB();
+  // Cho phép nơi gọi (CallRoom) nhận kết quả nhận giọng nói để hiển thị phụ đề
+  // và gửi sang người kia. Dùng ref để đổi callback KHÔNG phải tạo lại recognizer.
+  const onResultRef = useRef(onResult);
+  useEffect(() => { onResultRef.current = onResult; }, [onResult]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -74,12 +78,17 @@ var useSpeechToText = (roomId, userId, userName) => {
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) final += t + ' '; else inter += t;
       }
-      if (final && roomId && userId) {
+      const finalText = final.trim();
+      if (finalText && roomId && userId) {
         db.set('transcripts', `${roomId}_${Date.now()}_${userId}`, {
-          roomId, userId, userName, text: final.trim(), timestamp: Date.now(), language,
+          roomId, userId, userName, text: finalText, timestamp: Date.now(), language,
         });
       }
       setInterim(inter);
+      // Phát phụ đề ra ngoài: câu chốt (isFinal) để giữ lại, phần đang nói (interim)
+      // để hiển thị real-time. CallRoom sẽ hiện trên màn hình + broadcast cho người kia.
+      if (finalText) onResultRef.current?.({ text: finalText, isFinal: true, language });
+      else if (inter) onResultRef.current?.({ text: inter, isFinal: false, language });
     };
     rec.onerror = (e) => {
       const err = e?.error || '';

@@ -17,7 +17,28 @@ var WaveBackground = () => (
 // để PeerJS luôn lắng nghe cuộc gọi đến kể cả khi đang ở màn hình chat/danh bạ.
 // callTarget: peerId cần tự động gọi khi vừa vào phòng (cuộc gọi đi).
 var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
-  const stt = useSpeechToText('global', user.id, user.name);
+  // Phụ đề giọng nói (Speech-to-Text): câu của CHÍNH MÌNH (localCaption) và của
+  // NGƯỜI KIA (remoteCaption). Quan trọng với người khiếm thính — để "nghe bằng mắt".
+  const [localCaption, setLocalCaption] = useState('');
+  const [remoteCaption, setRemoteCaption] = useState('');
+  const localCapTimerRef = useRef(null);
+  const remoteCapTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (localCapTimerRef.current) clearTimeout(localCapTimerRef.current);
+    if (remoteCapTimerRef.current) clearTimeout(remoteCapTimerRef.current);
+  }, []);
+
+  // Khi mình nói: hiện phụ đề trên máy mình + gửi cho người kia. Câu chốt thì
+  // giữ vài giây rồi ẩn; phần đang nói (interim) ẩn ngay khi có câu mới.
+  const handleSttResult = useCallback(({ text, isFinal }) => {
+    if (!text) return;
+    setLocalCaption(text);
+    if (localCapTimerRef.current) clearTimeout(localCapTimerRef.current);
+    if (isFinal) localCapTimerRef.current = setTimeout(() => setLocalCaption(''), 4000);
+    try { peerConn.broadcast({ type: 'caption', text, isFinal, userName: user.name }); } catch (_) {}
+  }, [peerConn.broadcast, user.name]);
+
+  const stt = useSpeechToText('global', user.id, user.name, handleSttResult);
   const tts = useTextToSpeech();
   const visualAlert = useVisualAlerts();
   const localVideoRef = useRef(null);
@@ -120,6 +141,12 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
       } else if (data.type === 'call-ended') {
         // Người được gọi đã Từ chối (hoặc cúp máy) → thoát phòng ngay.
         onExitCall();
+      } else if (data.type === 'caption') {
+        // Phụ đề giọng nói của người kia → hiện làm "phụ đề phim" cạnh video.
+        if (!data.text) return;
+        setRemoteCaption(data.text);
+        if (remoteCapTimerRef.current) clearTimeout(remoteCapTimerRef.current);
+        if (data.isFinal) remoteCapTimerRef.current = setTimeout(() => setRemoteCaption(''), 5000);
       }
     });
   }, [peerConn.onData, visualAlert, onExitCall]);
@@ -321,6 +348,26 @@ var CallRoom = ({ user, media, peerConn, callTarget, onExitCall }) => {
               {remotePeers.length > 1 && (
                 <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full text-xs z-10">
                   +{remotePeers.length - 1} người khác
+                </div>
+              )}
+
+              {/* Phụ đề giọng nói — "nghe bằng mắt" cho người khiếm thính.
+                  Người kia hiện to (chính), lời của mình hiện nhỏ bên dưới. */}
+              {(remoteCaption || localCaption) && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[94%] max-w-3xl flex flex-col items-center gap-1.5 pointer-events-none">
+                  {remoteCaption && (
+                    <div className="w-full bg-black/75 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2.5 text-center shadow-2xl shadow-black/40">
+                      <span className="block text-[10px] uppercase tracking-wider text-sky-300/90 mb-0.5">
+                        {(firstPeer && firstPeer[1]?.name) || 'Người kia'} đang nói
+                      </span>
+                      <span className="text-white text-lg md:text-2xl font-semibold leading-snug break-words">{remoteCaption}</span>
+                    </div>
+                  )}
+                  {localCaption && (
+                    <div className="bg-black/55 backdrop-blur border border-white/10 rounded-xl px-3 py-1.5 text-center max-w-[88%]">
+                      <span className="text-slate-200 text-xs md:text-sm break-words">Bạn: {localCaption}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
